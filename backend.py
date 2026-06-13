@@ -13,6 +13,12 @@ app = modal.App("cyber-defense-range")
 # Configure persistent volume for model caching
 cache_volume = modal.Volume.from_name("huggingface-cache", create_if_missing=True)
 
+# Mount local scenarios.py file into the container
+scenarios_mount = modal.Mount.from_local_file(
+    local_path=os.path.join(os.path.dirname(__file__), "scenarios.py"),
+    remote_path="/root/scenarios.py"
+)
+
 # Build custom container image with security tools and OpenCode CLI
 image = (
     modal.Image.debian_slim()
@@ -114,7 +120,7 @@ def opencode_run(instruction: str, workspace_dir: str) -> str:
     return f"[OpenCode SDK Bash Fallback] Executing: {cmd}\n{res.stdout}\n{res.stderr}"
 
 # Stateful Execution Duel function
-@app.function(image=image)
+@app.function(image=image, mounts=[scenarios_mount])
 def run_duel_stream(scenario_id: int) -> Generator[tuple[str, str, str], None, None]:
     """
     Executes the multi-turn duel loop inside a single continuous stateful container.
