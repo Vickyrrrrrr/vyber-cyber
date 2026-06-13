@@ -134,7 +134,7 @@ def run_duel_stream(scenario_id: int) -> Generator[tuple[str, str, str], None, N
     time.sleep(1.5)
     
     # Check if we should use Simulated Agent mode
-    use_simulation = True
+    use_simulation = False
     
     if use_simulation:
         if scenario_id == 1:
