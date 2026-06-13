@@ -130,7 +130,8 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="zinc", secondary_hue="zinc")
         "Cyber-Range Simulation Dashboard"
         "</h1>"
         "<p style='color: #a1a1aa; font-size: 1.05rem; max-width: 800px; margin: 0 auto; line-height: 1.5; font-weight: 400;'>"
-        "Autonomous Red Team penetration testing vs. self-healing Blue Team defense agents in serverless container sandboxes."
+        "Autonomous Red Team penetration testing vs. self-healing Blue Team defense agents in serverless container sandboxes.<br/>"
+        "<span style='color: #d1d5db; font-size: 0.875rem; font-weight: 500; opacity: 0.85;'>Note: The first launch will take 3-4 minutes to allocate hardware and load model weights on the serverless GPU backend.</span>"
         "</p>"
         "</div>"
     )

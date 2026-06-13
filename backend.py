@@ -88,7 +88,6 @@ class CyberRangeScenarios:
     def validate_scenario(scenario_id: int, base_dir: str) -> tuple[bool, str]:
         """
         Validates whether the vulnerability in the given base directory has been resolved.
-        Returns (is_secure, explanation_message).
         """
         if scenario_id == 1:
             config_path = os.path.join(base_dir, "app_config.json")
@@ -294,7 +293,7 @@ def run_duel_stream(scenario_id: int) -> Generator[tuple[str, str, str], None, N
     yield (red_terminal, blue_terminal, "Target environment initialized. Initiating Attack Reconnaissance...")
     time.sleep(1.5)
     
-    # Check if we should use Simulated Agent mode
+    # Check if we should use Simulated Agent mode (set to False for live AI execution)
     use_simulation = False
     
     if use_simulation:
@@ -307,7 +306,6 @@ def run_duel_stream(scenario_id: int) -> Generator[tuple[str, str, str], None, N
             yield (red_terminal, blue_terminal, "Attack Reconnaissance phase active...")
             time.sleep(2.0)
             
-            # Execute OpenCode
             out = opencode_run("List contents of directory", base_dir)
             red_terminal += f"Output    :\n{out}\n"
             yield (red_terminal, blue_terminal, "Attack Reconnaissance phase active...")
@@ -526,6 +524,205 @@ def run_duel_stream(scenario_id: int) -> Generator[tuple[str, str, str], None, N
             yield (red_terminal, blue_terminal, "Mitigation complete. Initiating validation verification scan...")
             time.sleep(2.0)
             
+    else:
+        # ==========================================
+        # Live AI Execution Loop (Dynamic reasoning)
+        # ==========================================
+        # Instantiate ModelServer client inside Modal container
+        model_server = ModelServer()
+        
+        # --- Live Red Team Recon ---
+        red_terminal += "\n[ATTACK AGENT RECONNAISSANCE]\n"
+        red_terminal += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        
+        # Scenario-specific guidance prompt for Red Team LLM
+        if scenario_id == 1:
+            target_description = "The target is a node configuration folder. File: app_config.json. Identify hardcoded secrets."
+        elif scenario_id == 2:
+            target_description = "The target is a database settings configuration. File: db_settings.yaml. Identify exposed ports and auth settings."
+        else:
+            target_description = "The target is a data communication pipeline config. File: pipeline_config.json, traffic_stream.log. Check for plain-text data transit."
+            
+        red_prompt = f"""[SYSTEM]
+You are an elite Red Team penetration tester. Your target is the '/tmp/sandbox/' directory inside this container.
+Goal: Run recon commands, identify the security vulnerability, and formulate a structured exploit strategy.
+You can execute non-interactive commands using the OpenCode CLI. Format your actions exactly like this:
+Thought: <reasoning explaining what you want to achieve>
+Action: opencode
+Instruction: <exact instruction to OpenCode script runner, e.g. "List files in sandbox" or "Read app_config.json" or "Run nmap scan on database configuration">
+
+Target Context: {target_description}
+
+Once you have identified the vulnerability and confirmed it, commit your exploit plan in this exact JSON format:
+```json
+{{
+  "vulnerability": "detailed description of what is exposed",
+  "exploit_plan": "step-by-step description of how to exploit this"
+}}
+```
+Do not output the JSON until you have executed commands and confirmed the data.
+
+Begin reconnaissance.
+"""
+        
+        exploit_plan_txt = ""
+        # Multi-turn reasoning loop (Max 2 turns for speed)
+        for turn in range(2):
+            yield (red_terminal + "...Thinking...", blue_terminal, "Attack Reconnaissance active...")
+            response = model_server.generate.remote(red_prompt)
+            
+            # Parse reasoning and action
+            thought = ""
+            instruction = ""
+            
+            if "Thought:" in response:
+                thought = response.split("Thought:")[1].split("Action:")[0].strip()
+            
+            if "Action: opencode" in response:
+                try:
+                    instruction = response.split("Instruction:")[1].strip()
+                    # Strip any trailing JSON if LLM outputted both
+                    if "```json" in instruction:
+                        instruction = instruction.split("```json")[0].strip()
+                except Exception:
+                    instruction = "List contents of directory"
+                    
+            if instruction:
+                red_terminal += f"Reasoning : {thought}\n"
+                red_terminal += f"Tool Call : OpenCode - {instruction}\n"
+                yield (red_terminal + "...Executing...", blue_terminal, "Executing Recon command...")
+                
+                # Execute real tool command inside container
+                out = opencode_run(instruction, base_dir)
+                red_terminal += f"Output    :\n{out}\n"
+                red_terminal += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                yield (red_terminal, blue_terminal, "Attack Reconnaissance active...")
+                
+                # Feed output back to LLM context
+                red_prompt += f"\n{response}\nOutput:\n{out}\nNext Step:"
+                time.sleep(1.0)
+            elif "```json" in response:
+                exploit_plan_txt = response.split("```json")[1].split("```")[0].strip()
+                break
+            else:
+                # Fallback if LLM output is unstructured
+                exploit_plan_txt = response
+                break
+                
+        if not exploit_plan_txt:
+            # Generate final exploit plan if turns exhausted without JSON commit
+            red_prompt += "\nFormat your final exploit strategy as a JSON block now."
+            response = model_server.generate.remote(red_prompt)
+            if "```json" in response:
+                exploit_plan_txt = response.split("```json")[1].split("```")[0].strip()
+            else:
+                exploit_plan_txt = response
+                
+        red_terminal += f"\n[VULNERABILITY IDENTIFIED]\n"
+        red_terminal += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        red_terminal += f"Action    : Committing Exploit Strategy JSON:\n{exploit_plan_txt}\n"
+        yield (red_terminal, blue_terminal, "Target compromised. Exploit plan verified.")
+        time.sleep(2.0)
+        
+        # --- Live Blue Team SOC Analyst & Healing ---
+        blue_terminal += "\n[DEFENSE AGENT DETECTION & ANOMALY ALERT]\n"
+        blue_terminal += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        blue_terminal += "Trigger   : Intrusion telemetry triggered. Red Team exploit plan intercepted.\n"
+        yield (red_terminal, blue_terminal, "Anomaly detected. Initializing SOC analyst...")
+        
+        blue_prompt = f"""[SYSTEM]
+You are a Blue Team automated SOC analyst and self-healing security agent.
+An intruder has compromised the sandbox environment. Here is their exploit plan:
+{exploit_plan_txt}
+
+Your goal is to edit the target configuration file to remove the vulnerability (parameterize credentials, bind database to localhost, or enable SSL/ciphers).
+You have access to two tools:
+1. Edit File tool (replace/overwrite file content):
+Action: edit
+File: <exact file path, e.g. /tmp/sandbox/app_config.json>
+Content:
+<new configuration file content here>
+
+2. OpenCode CLI (run permission or firewall rules):
+Action: opencode
+Instruction: <exact instruction to OpenCode script runner, e.g. "chmod 600 app_config.json">
+
+Your response must follow this format:
+Thought: <reasoning explaining why you are applying this patch>
+Action: <edit or opencode>
+File/Instruction: <file path or command instruction>
+[Content: if editing]
+<content>
+
+Once the vulnerability is fully patched and the system is secured, output "MITIGATION_COMPLETE".
+"""
+        
+        # Multi-turn defense healing loop
+        for turn in range(2):
+            yield (red_terminal, blue_terminal + "...Thinking...", "Defense Agent formulating patch...")
+            response = model_server.generate.remote(blue_prompt)
+            
+            thought = ""
+            action = ""
+            
+            if "Thought:" in response:
+                thought = response.split("Thought:")[1].split("Action:")[0].strip()
+                
+            if "Action: edit" in response:
+                try:
+                    filepath = response.split("File:")[1].split("Content:")[0].strip()
+                    content = response.split("Content:")[1].strip()
+                    if "MITIGATION_COMPLETE" in content:
+                        content = content.split("MITIGATION_COMPLETE")[0].strip()
+                except Exception:
+                    # Fallback file paths
+                    filepath = os.path.join(base_dir, "app_config.json") if scenario_id == 1 else (os.path.join(base_dir, "db_settings.yaml") if scenario_id == 2 else os.path.join(base_dir, "pipeline_config.json"))
+                    content = "{}"
+                    
+                blue_terminal += f"Reasoning : {thought}\n"
+                blue_terminal += f"Action    : Use edit tool to rewrite {os.path.basename(filepath)}.\n"
+                yield (red_terminal, blue_terminal + "...Applying patch...", "Deploying self-healing code fix...")
+                
+                # Execute real edit/rewrite in sandbox container
+                with open(filepath, "w") as f:
+                    f.write(content)
+                    
+                blue_terminal += f"Output    : File updated successfully.\n[NEW CONFIGURATION applied]:\n{content}\n"
+                blue_terminal += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                yield (red_terminal, blue_terminal, "Mitigation in progress...")
+                
+                blue_prompt += f"\n{response}\nOutput: File edited successfully.\nNext Action:"
+                time.sleep(1.0)
+                
+            elif "Action: opencode" in response:
+                try:
+                    instruction = response.split("Instruction:")[1].strip()
+                except Exception:
+                    instruction = "chmod 600 app_config.json"
+                    
+                blue_terminal += f"Reasoning : {thought}\n"
+                blue_terminal += f"Tool Call : OpenCode - {instruction}\n"
+                yield (red_terminal, blue_terminal + "...Executing...", "Applying hardening rule...")
+                
+                # Execute real tool/chmod command inside container
+                out = opencode_run(instruction, base_dir)
+                blue_terminal += f"Status    : Hardening rule executed. Output: {out}\n"
+                blue_terminal += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                yield (red_terminal, blue_terminal, "Hardening in progress...")
+                
+                blue_prompt += f"\n{response}\nOutput:\n{out}\nNext Action:"
+                time.sleep(1.0)
+            elif "MITIGATION_COMPLETE" in response:
+                blue_terminal += f"Reasoning : {thought}\n"
+                blue_terminal += "Status    : Mitigation verified and completed.\n"
+                break
+            else:
+                break
+                
+        blue_terminal += "Status    : Patch deployment finalized. Initiating validation verification scan.\n"
+        yield (red_terminal, blue_terminal, "Mitigation complete. Initiating validation verification scan...")
+        time.sleep(1.5)
+        
     # 4. Final Validation check
     is_secure, status_msg = CyberRangeScenarios.validate_scenario(scenario_id, base_dir)
     
