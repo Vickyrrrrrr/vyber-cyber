@@ -177,8 +177,8 @@ cache_volume = modal.Volume.from_name("huggingface-cache", create_if_missing=Tru
 
 # Build custom container image with security tools and Vyber CLI backend
 image = (
-    modal.Image.debian_slim()
-    .apt_install("nmap", "curl", "git", "python3-pip")
+    modal.Image.from_registry("nvidia/cuda:12.1.1-devel-ubuntu22.04", add_python="3.11")
+    .apt_install("nmap", "curl", "git")
     .run_commands(
         "curl -fsSL https://opencode.ai/install | bash",
         "ln -s /usr/local/bin/opencode /usr/local/bin/vyber"
@@ -187,7 +187,7 @@ image = (
 )
 
 # Host the Serverless LLM Worker
-@app.cls(gpu="A10G", image=image, volumes={"/cache": cache_volume}, timeout=600)
+@app.cls(gpu="A10G", image=image, volumes={"/cache": cache_volume}, timeout=600, env={"VLLM_USE_FLASHINFER": "0"})
 class ModelServer:
     @modal.enter()
     def load_model(self):
