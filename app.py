@@ -102,6 +102,33 @@ def launch_duel(scenario_name):
     }
     scenario_id = scenario_map.get(scenario_name, 1)
     
+    # 1. Preflight diagnostic logs for user feedback
+    preflight_red = [
+        "SYSTEM: Initializing offensive sandbox connection...",
+        "SYSTEM: Scanning for target network gateways...",
+        "SYSTEM: Resolving hardware context: Requesting serverless GPU allocation...",
+        "SYSTEM: Secure GPU Node provisioned: NVIDIA A10G (24GB VRAM)",
+        "SYSTEM: Sourcing Red Team Agent exploit profiles...",
+    ]
+    preflight_blue = [
+        "SYSTEM: Initializing defensive SOC pipeline...",
+        "SYSTEM: Activating real-time file integrity monitors...",
+        "SYSTEM: Establishing telemetry bridge to target sandbox...",
+        "SYSTEM: Secure sandbox isolated at /tmp/sandbox/",
+        "SYSTEM: Sourcing Blue Team Agent mitigation strategies...",
+    ]
+    
+    red_log = ""
+    blue_log = ""
+    for i in range(len(preflight_red)):
+        red_log += preflight_red[i] + "\n"
+        blue_log += preflight_blue[i] + "\n"
+        step_percent = (i + 1) * 20
+        yield red_log, blue_log, f"Status: Preflight checks in progress... {step_percent}%"
+        time.sleep(0.35)
+        
+    yield red_log, blue_log, "Status: Contacting GPU serverless host. Loading weights... (Cold start takes ~2 mins on first run)"
+    
     # Connect securely to active Modal application
     openai_api_key = os.environ.get("OPENAI_API_KEY", "")
     try:
@@ -109,7 +136,9 @@ def launch_duel(scenario_name):
         f = modal.Function.from_name("cyber-defense-range", "run_duel_stream")
         # Call generator to stream outputs character-by-character
         for red_out, blue_out, banner_txt in f.remote_gen(scenario_id, openai_api_key=openai_api_key):
-            yield red_out, blue_out, f"Status: {banner_txt}"
+            combined_red = red_log + "\n" + red_out if red_out else red_log
+            combined_blue = blue_log + "\n" + blue_out if blue_out else blue_log
+            yield combined_red, combined_blue, f"Status: {banner_txt}"
     except Exception as e:
         print(f"Modal Remote Gen lookup failed: {e}. Falling back to local execution.")
         # Fallback to local import if Modal client is not fully authenticated/connected
@@ -118,7 +147,9 @@ def launch_duel(scenario_name):
             from backend import run_duel_stream
             # Execute generator locally (directly calls the function logic)
             for red_out, blue_out, banner_txt in run_duel_stream.local(scenario_id, openai_api_key=openai_api_key):
-                yield red_out, blue_out, f"Status: {banner_txt}"
+                combined_red = red_log + "\n" + red_out if red_out else red_log
+                combined_blue = blue_log + "\n" + blue_out if blue_out else blue_log
+                yield combined_red, combined_blue, f"Status: {banner_txt}"
         except Exception as local_err:
             error_msg = f"Red Team Agent connection error:\n{str(e)}\nLocal Fallback error:\n{str(local_err)}"
             yield error_msg, "Blue Team SOC connection offline.", "Status: Connection Error"
