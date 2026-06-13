@@ -5,6 +5,7 @@ import yaml
 import subprocess
 from typing import Generator
 import modal
+from scenarios import CyberRangeScenarios
 
 # Define Modal App
 app = modal.App("cyber-defense-range")
@@ -119,8 +120,6 @@ def run_duel_stream(scenario_id: int) -> Generator[tuple[str, str, str], None, N
     Executes the multi-turn duel loop inside a single continuous stateful container.
     Yields (red_terminal, blue_terminal, banner_text) to the Gradio frontend.
     """
-    from scenarios import CyberRangeScenarios
-    
     base_dir = "/tmp/sandbox"
     
     # 1. Initialize Scenario
