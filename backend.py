@@ -13,18 +13,17 @@ app = modal.App("cyber-defense-range")
 # Configure persistent volume for model caching
 cache_volume = modal.Volume.from_name("huggingface-cache", create_if_missing=True)
 
-# Mount local scenarios.py file into the container
-scenarios_mount = modal.Mount.from_local_file(
-    local_path=os.path.join(os.path.dirname(__file__), "scenarios.py"),
-    remote_path="/root/scenarios.py"
-)
-
 # Build custom container image with security tools and OpenCode CLI
 image = (
     modal.Image.debian_slim()
     .apt_install("nmap", "curl", "git", "python3-pip")
     .run_commands("curl -fsSL https://opencode.ai/install | bash")
     .pip_install("openai", "gradio", "pyyaml")
+    # Add local scenarios.py file to the container image (replaces deprecated modal.Mount API)
+    .add_local_file(
+        os.path.join(os.path.dirname(__file__), "scenarios.py"),
+        "/root/scenarios.py"
+    )
 )
 
 # Host the Serverless LLM Worker
@@ -120,7 +119,7 @@ def opencode_run(instruction: str, workspace_dir: str) -> str:
     return f"[OpenCode SDK Bash Fallback] Executing: {cmd}\n{res.stdout}\n{res.stderr}"
 
 # Stateful Execution Duel function
-@app.function(image=image, mounts=[scenarios_mount])
+@app.function(image=image)
 def run_duel_stream(scenario_id: int) -> Generator[tuple[str, str, str], None, None]:
     """
     Executes the multi-turn duel loop inside a single continuous stateful container.
