@@ -256,8 +256,12 @@ def vyber_run(instruction: str, workspace_dir: str) -> str:
         pass
     
     # Fallback simulation logic for Vyber CLI commands
-    instruction_lower = instruction.lower()
-    if "list" in instruction_lower or "ls" in instruction_lower:
+    instruction_lower = instruction.lower().strip()
+    
+    # Check if the instruction starts with or contains direct shell commands
+    if any(cmd_name in instruction_lower for cmd_name in ["chmod", "iptables", "mkdir", "touch", "rm", "cp", "mv", "grep", "echo"]):
+        cmd = instruction
+    elif "list" in instruction_lower or "ls" in instruction_lower:
         cmd = "ls -la"
     elif "inspect" in instruction_lower or "cat" in instruction_lower or "read" in instruction_lower:
         if "app_config" in instruction_lower:
@@ -273,7 +277,11 @@ def vyber_run(instruction: str, workspace_dir: str) -> str:
     elif "nmap" in instruction_lower:
         cmd = "nmap localhost"
     else:
-        cmd = "ls -la"
+        # Default fallback to executing the instruction if it looks like a bash command, otherwise ls -la
+        if len(instruction.split()) <= 4 and not any(x in instruction_lower for x in ["help", "please", "could", "you"]):
+            cmd = instruction
+        else:
+            cmd = "ls -la"
         
     res = subprocess.run(cmd, shell=True, capture_output=True, text=True, cwd=workspace_dir)
     return f"[Vyber Agent SDK Fallback] Executing: {cmd}\n{res.stdout}\n{res.stderr}"
