@@ -1,3 +1,4 @@
 modal
 gradio
 pyyaml
+huggingface_hub==0.23.2
