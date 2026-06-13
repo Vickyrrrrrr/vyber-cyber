@@ -178,7 +178,7 @@ cache_volume = modal.Volume.from_name("huggingface-cache", create_if_missing=Tru
 # Build custom container image with security tools and Vyber CLI backend
 image = (
     modal.Image.from_registry("nvidia/cuda:12.1.1-devel-ubuntu22.04", add_python="3.11")
-    .apt_install("nmap", "curl", "git", "build-essential", "cmake")
+    .apt_install("nmap", "curl", "git", "build-essential", "cmake", "clang")
     .run_commands(
         "CMAKE_ARGS='-DGGML_CUDA=on' pip install llama-cpp-python",
         "curl -fsSL https://opencode.ai/install | bash",
