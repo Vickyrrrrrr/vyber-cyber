@@ -104,8 +104,8 @@ def launch_duel(scenario_name):
     
     # Connect securely to active Modal application
     try:
-        # Lookup the remote function
-        f = modal.Function.lookup("cyber-defense-range", "run_duel_stream")
+        # Lookup the remote function using modern from_name
+        f = modal.Function.from_name("cyber-defense-range", "run_duel_stream")
         # Call generator to stream outputs character-by-character
         for red_out, blue_out, banner_txt in f.remote_gen(scenario_id):
             yield red_out, blue_out, f"Status: {banner_txt}"
@@ -116,7 +116,7 @@ def launch_duel(scenario_name):
             # We import here to avoid circular dependencies
             from backend import run_duel_stream
             # Execute generator locally (directly calls the function logic)
-            for red_out, blue_out, banner_txt in run_duel_stream(scenario_id):
+            for red_out, blue_out, banner_txt in run_duel_stream.local(scenario_id):
                 yield red_out, blue_out, f"Status: {banner_txt}"
         except Exception as local_err:
             error_msg = f"Red Team Agent connection error:\n{str(e)}\nLocal Fallback error:\n{str(local_err)}"
