@@ -178,43 +178,66 @@ cache_volume = modal.Volume.from_name("huggingface-cache", create_if_missing=Tru
 # Build custom container image with security tools and Vyber CLI backend
 image = (
     modal.Image.from_registry("nvidia/cuda:12.1.1-devel-ubuntu22.04", add_python="3.11")
-    .apt_install("nmap", "curl", "git")
+    .apt_install("nmap", "curl", "git", "build-essential", "cmake")
     .run_commands(
+        "CMAKE_ARGS='-DGGML_CUDA=on' pip install llama-cpp-python",
         "curl -fsSL https://opencode.ai/install | bash",
         "ln -s /usr/local/bin/opencode /usr/local/bin/vyber"
     )
-    .pip_install("vllm", "openai", "gradio", "pyyaml")
+    .pip_install("openai", "gradio", "pyyaml", "huggingface_hub")
 )
 
+# Configure persistent volume for model caching
+cache_volume = modal.Volume.from_name("huggingface-cache", create_if_missing=True)
+
 # Host the Serverless LLM Worker
-@app.cls(gpu="A10G", image=image, volumes={"/cache": cache_volume}, timeout=600, env={"VLLM_USE_FLASHINFER": "0"})
+@app.cls(gpu="A10G", image=image, volumes={"/cache": cache_volume}, timeout=600)
 class ModelServer:
     @modal.enter()
     def load_model(self):
         try:
-            from vllm import LLM, SamplingParams
-            model_name = "Qwen/Qwen2.5-7B-Instruct"
-            print(f"Loading model {model_name} from cache...")
-            self.llm = LLM(
-                model=model_name,
-                download_dir="/cache",
-                max_model_len=2048
+            from llama_cpp import Llama
+            from huggingface_hub import hf_hub_download
+            
+            repo_id = "vxkyyy/vyber-security-1.5b-gguf"
+            filename = "vyber-security-1.5b.gguf"
+            
+            print(f"Downloading model {filename} from {repo_id}...")
+            try:
+                model_path = hf_hub_download(
+                    repo_id=repo_id, 
+                    filename=filename,
+                    cache_dir="/cache"
+                )
+            except Exception as hf_err:
+                print(f"Failed to download fine-tuned model: {hf_err}. Falling back to public Qwen2.5-1.5B...")
+                model_path = hf_hub_download(
+                    repo_id="Qwen/Qwen2.5-1.5B-Instruct-GGUF",
+                    filename="qwen2.5-1.5b-instruct-q8_0.gguf",
+                    cache_dir="/cache"
+                )
+            
+            print(f"Loading GGUF model from {model_path} via llama.cpp...")
+            self.llm = Llama(
+                model_path=model_path,
+                n_ctx=2048,
+                n_gpu_layers=-1
             )
-            self.sampling_params = SamplingParams(
-                temperature=0.1,
-                max_tokens=512,
-                stop=["<|im_end|>", "<|endoftext|>"]
-            )
-            self.vllm_available = True
+            self.llm_available = True
         except Exception as e:
-            print(f"vLLM initialization failed: {e}. Falling back to API client.")
-            self.vllm_available = False
+            print(f"Llama.cpp initialization failed: {e}. Falling back to API client.")
+            self.llm_available = False
 
     @modal.method()
     def generate(self, prompt: str, api_key: str = None) -> str:
-        if self.vllm_available:
-            outputs = self.llm.generate([prompt], self.sampling_params)
-            return outputs[0].outputs[0].text
+        if self.llm_available:
+            res = self.llm(
+                prompt,
+                max_tokens=512,
+                temperature=0.1,
+                stop=["<|im_end|>", "<|endoftext|>"]
+            )
+            return res["choices"][0]["text"]
         else:
             return self._fallback_generate(prompt, api_key)
 
