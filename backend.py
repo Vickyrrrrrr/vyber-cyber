@@ -175,11 +175,14 @@ app = modal.App("cyber-defense-range")
 # Configure persistent volume for model caching
 cache_volume = modal.Volume.from_name("huggingface-cache", create_if_missing=True)
 
-# Build custom container image with security tools and OpenCode CLI
+# Build custom container image with security tools and Vyber CLI backend
 image = (
     modal.Image.debian_slim()
     .apt_install("nmap", "curl", "git", "python3-pip")
-    .run_commands("curl -fsSL https://opencode.ai/install | bash")
+    .run_commands(
+        "curl -fsSL https://opencode.ai/install | bash",
+        "ln -s /usr/local/bin/opencode /usr/local/bin/vyber"
+    )
     .pip_install("openai", "gradio", "pyyaml")
 )
 
@@ -232,15 +235,16 @@ class ModelServer:
         else:
             return "MOCK_RESPONSE"
 
-# Helper function to invoke OpenCode CLI or fallback
-def opencode_run(instruction: str, workspace_dir: str) -> str:
+# Helper function to invoke Vyber CLI or fallback
+def vyber_run(instruction: str, workspace_dir: str) -> str:
     """
-    Runs an instruction via the OpenCode CLI in non-interactive script mode.
+    Runs an instruction via the Vyber CLI in non-interactive script mode.
     If the CLI fails or isn't authenticated, it falls back to standard execution.
     """
     try:
+        # Standard non-interactive script execution with Vyber
         res = subprocess.run(
-            ["opencode", "run", instruction],
+            ["vyber", "run", instruction],
             capture_output=True,
             text=True,
             cwd=workspace_dir,
@@ -251,7 +255,7 @@ def opencode_run(instruction: str, workspace_dir: str) -> str:
     except Exception:
         pass
     
-    # Fallback simulation logic for OpenCode CLI commands
+    # Fallback simulation logic for Vyber CLI commands
     instruction_lower = instruction.lower()
     if "list" in instruction_lower or "ls" in instruction_lower:
         cmd = "ls -la"
@@ -272,7 +276,7 @@ def opencode_run(instruction: str, workspace_dir: str) -> str:
         cmd = "ls -la"
         
     res = subprocess.run(cmd, shell=True, capture_output=True, text=True, cwd=workspace_dir)
-    return f"[OpenCode SDK Bash Fallback] Executing: {cmd}\n{res.stdout}\n{res.stderr}"
+    return f"[Vyber Agent SDK Fallback] Executing: {cmd}\n{res.stdout}\n{res.stderr}"
 
 # Stateful Execution Duel function
 @app.function(image=image)
@@ -302,11 +306,12 @@ def run_duel_stream(scenario_id: int) -> Generator[tuple[str, str, str], None, N
             red_terminal += "\n[ATTACK AGENT RECONNAISSANCE]\n"
             red_terminal += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             red_terminal += "Reasoning : Scan target workspace to identify configuration files.\n"
-            red_terminal += "Tool Call : OpenCode CLI - List directory\n"
+            red_terminal += "Tool Call : Vyber CLI - List directory\n"
             yield (red_terminal, blue_terminal, "Attack Reconnaissance phase active...")
             time.sleep(2.0)
             
-            out = opencode_run("List contents of directory", base_dir)
+            # Execute Vyber
+            out = vyber_run("List contents of directory", base_dir)
             red_terminal += f"Output    :\n{out}\n"
             yield (red_terminal, blue_terminal, "Attack Reconnaissance phase active...")
             time.sleep(2.0)
@@ -314,11 +319,11 @@ def run_duel_stream(scenario_id: int) -> Generator[tuple[str, str, str], None, N
             red_terminal += "\n[ATTACK AGENT RECONNAISSANCE]\n"
             red_terminal += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             red_terminal += "Reasoning : app_config.json detected. Reading file content to search for secrets.\n"
-            red_terminal += "Tool Call : OpenCode CLI - Read app_config.json\n"
+            red_terminal += "Tool Call : Vyber CLI - Read app_config.json\n"
             yield (red_terminal, blue_terminal, "Attack Reconnaissance phase active...")
             time.sleep(2.0)
             
-            out = opencode_run("Read app_config.json", base_dir)
+            out = vyber_run("Read app_config.json", base_dir)
             red_terminal += f"Output    :\n{out}\n"
             yield (red_terminal, blue_terminal, "Attack Reconnaissance phase active...")
             time.sleep(2.0)
@@ -363,7 +368,7 @@ def run_duel_stream(scenario_id: int) -> Generator[tuple[str, str, str], None, N
             blue_terminal += "\n[DEFENSE AGENT HARDENING]\n"
             blue_terminal += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             blue_terminal += "Reasoning : Restricting file permissions to prevent future unauthorized reads.\n"
-            blue_terminal += "Tool Call : OpenCode CLI - Shell: chmod 600 app_config.json\n"
+            blue_terminal += "Tool Call : Vyber CLI - Shell: chmod 600 app_config.json\n"
             yield (red_terminal, blue_terminal, "Deploying self-healing code fix...")
             time.sleep(2.0)
             
@@ -377,11 +382,11 @@ def run_duel_stream(scenario_id: int) -> Generator[tuple[str, str, str], None, N
             red_terminal += "\n[ATTACK AGENT RECONNAISSANCE]\n"
             red_terminal += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             red_terminal += "Reasoning : Scan sandbox target directory for active network configurations.\n"
-            red_terminal += "Tool Call : OpenCode CLI - List directory\n"
+            red_terminal += "Tool Call : Vyber CLI - List directory\n"
             yield (red_terminal, blue_terminal, "Attack Reconnaissance phase active...")
             time.sleep(2.0)
             
-            out = opencode_run("List configuration files", base_dir)
+            out = vyber_run("List configuration files", base_dir)
             red_terminal += f"Output    :\n{out}\n"
             yield (red_terminal, blue_terminal, "Attack Reconnaissance phase active...")
             time.sleep(2.0)
@@ -389,11 +394,11 @@ def run_duel_stream(scenario_id: int) -> Generator[tuple[str, str, str], None, N
             red_terminal += "\n[ATTACK AGENT RECONNAISSANCE]\n"
             red_terminal += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             red_terminal += "Reasoning : db_settings.yaml detected. Reading contents to examine database parameters.\n"
-            red_terminal += "Tool Call : OpenCode CLI - Read db_settings.yaml\n"
+            red_terminal += "Tool Call : Vyber CLI - Read db_settings.yaml\n"
             yield (red_terminal, blue_terminal, "Attack Reconnaissance phase active...")
             time.sleep(2.0)
             
-            out = opencode_run("Read db_settings.yaml", base_dir)
+            out = vyber_run("Read db_settings.yaml", base_dir)
             red_terminal += f"Output    :\n{out}\n"
             yield (red_terminal, blue_terminal, "Attack Reconnaissance phase active...")
             time.sleep(2.0)
@@ -441,7 +446,7 @@ def run_duel_stream(scenario_id: int) -> Generator[tuple[str, str, str], None, N
             blue_terminal += "\n[DEFENSE AGENT HARDENING]\n"
             blue_terminal += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             blue_terminal += "Reasoning : Deploying local firewall rule to isolate port 5432.\n"
-            blue_terminal += "Tool Call : OpenCode CLI - Shell: iptables rule deployment (simulated)\n"
+            blue_terminal += "Tool Call : Vyber CLI - Shell: iptables rule deployment (simulated)\n"
             yield (red_terminal, blue_terminal, "Deploying self-healing code fix...")
             time.sleep(2.0)
             
@@ -454,11 +459,11 @@ def run_duel_stream(scenario_id: int) -> Generator[tuple[str, str, str], None, N
             red_terminal += "\n[ATTACK AGENT RECONNAISSANCE]\n"
             red_terminal += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             red_terminal += "Reasoning : Inspect active data-stream logs to intercept credentials in transit.\n"
-            red_terminal += "Tool Call : OpenCode CLI - Read traffic_stream.log\n"
+            red_terminal += "Tool Call : Vyber CLI - Read traffic_stream.log\n"
             yield (red_terminal, blue_terminal, "Attack Reconnaissance phase active...")
             time.sleep(2.0)
             
-            out = opencode_run("Read traffic_stream.log", base_dir)
+            out = vyber_run("Read traffic_stream.log", base_dir)
             red_terminal += f"Output    :\n{out}\n"
             yield (red_terminal, blue_terminal, "Attack Reconnaissance phase active...")
             time.sleep(2.0)
@@ -466,11 +471,11 @@ def run_duel_stream(scenario_id: int) -> Generator[tuple[str, str, str], None, N
             red_terminal += "\n[ATTACK AGENT RECONNAISSANCE]\n"
             red_terminal += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             red_terminal += "Reasoning : Logs show plaintext billing traffic. Reading pipeline_config.json.\n"
-            red_terminal += "Tool Call : OpenCode CLI - Read pipeline_config.json\n"
+            red_terminal += "Tool Call : Vyber CLI - Read pipeline_config.json\n"
             yield (red_terminal, blue_terminal, "Attack Reconnaissance phase active...")
             time.sleep(2.0)
             
-            out = opencode_run("Read pipeline_config.json", base_dir)
+            out = vyber_run("Read pipeline_config.json", base_dir)
             red_terminal += f"Output    :\n{out}\n"
             yield (red_terminal, blue_terminal, "Attack Reconnaissance phase active...")
             time.sleep(2.0)
@@ -516,7 +521,7 @@ def run_duel_stream(scenario_id: int) -> Generator[tuple[str, str, str], None, N
             blue_terminal += "\n[DEFENSE AGENT HARDENING]\n"
             blue_terminal += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             blue_terminal += "Reasoning : Triggering reload of trusted CA certificates on pipeline gateway.\n"
-            blue_terminal += "Tool Call : OpenCode CLI - Shell: update CA certificate stores.\n"
+            blue_terminal += "Tool Call : Vyber CLI - Shell: update CA certificate stores.\n"
             yield (red_terminal, blue_terminal, "Deploying self-healing code fix...")
             time.sleep(2.0)
             
@@ -528,14 +533,12 @@ def run_duel_stream(scenario_id: int) -> Generator[tuple[str, str, str], None, N
         # ==========================================
         # Live AI Execution Loop (Dynamic reasoning)
         # ==========================================
-        # Instantiate ModelServer client inside Modal container
         model_server = ModelServer()
         
         # --- Live Red Team Recon ---
         red_terminal += "\n[ATTACK AGENT RECONNAISSANCE]\n"
         red_terminal += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         
-        # Scenario-specific guidance prompt for Red Team LLM
         if scenario_id == 1:
             target_description = "The target is a node configuration folder. File: app_config.json. Identify hardcoded secrets."
         elif scenario_id == 2:
@@ -546,10 +549,10 @@ def run_duel_stream(scenario_id: int) -> Generator[tuple[str, str, str], None, N
         red_prompt = f"""[SYSTEM]
 You are an elite Red Team penetration tester. Your target is the '/tmp/sandbox/' directory inside this container.
 Goal: Run recon commands, identify the security vulnerability, and formulate a structured exploit strategy.
-You can execute non-interactive commands using the OpenCode CLI. Format your actions exactly like this:
+You can execute non-interactive commands using the Vyber CLI. Format your actions exactly like this:
 Thought: <reasoning explaining what you want to achieve>
-Action: opencode
-Instruction: <exact instruction to OpenCode script runner, e.g. "List files in sandbox" or "Read app_config.json" or "Run nmap scan on database configuration">
+Action: vyber
+Instruction: <exact instruction to Vyber script runner, e.g. "List files in sandbox" or "Read app_config.json" or "Run nmap scan on database configuration">
 
 Target Context: {target_description}
 
@@ -566,22 +569,19 @@ Begin reconnaissance.
 """
         
         exploit_plan_txt = ""
-        # Multi-turn reasoning loop (Max 2 turns for speed)
         for turn in range(2):
             yield (red_terminal + "...Thinking...", blue_terminal, "Attack Reconnaissance active...")
             response = model_server.generate.remote(red_prompt)
             
-            # Parse reasoning and action
             thought = ""
             instruction = ""
             
             if "Thought:" in response:
                 thought = response.split("Thought:")[1].split("Action:")[0].strip()
             
-            if "Action: opencode" in response:
+            if "Action: vyber" in response:
                 try:
                     instruction = response.split("Instruction:")[1].strip()
-                    # Strip any trailing JSON if LLM outputted both
                     if "```json" in instruction:
                         instruction = instruction.split("```json")[0].strip()
                 except Exception:
@@ -589,28 +589,25 @@ Begin reconnaissance.
                     
             if instruction:
                 red_terminal += f"Reasoning : {thought}\n"
-                red_terminal += f"Tool Call : OpenCode - {instruction}\n"
+                red_terminal += f"Tool Call : Vyber - {instruction}\n"
                 yield (red_terminal + "...Executing...", blue_terminal, "Executing Recon command...")
                 
                 # Execute real tool command inside container
-                out = opencode_run(instruction, base_dir)
+                out = vyber_run(instruction, base_dir)
                 red_terminal += f"Output    :\n{out}\n"
                 red_terminal += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                 yield (red_terminal, blue_terminal, "Attack Reconnaissance active...")
                 
-                # Feed output back to LLM context
                 red_prompt += f"\n{response}\nOutput:\n{out}\nNext Step:"
                 time.sleep(1.0)
             elif "```json" in response:
                 exploit_plan_txt = response.split("```json")[1].split("```")[0].strip()
                 break
             else:
-                # Fallback if LLM output is unstructured
                 exploit_plan_txt = response
                 break
                 
         if not exploit_plan_txt:
-            # Generate final exploit plan if turns exhausted without JSON commit
             red_prompt += "\nFormat your final exploit strategy as a JSON block now."
             response = model_server.generate.remote(red_prompt)
             if "```json" in response:
@@ -643,13 +640,13 @@ File: <exact file path, e.g. /tmp/sandbox/app_config.json>
 Content:
 <new configuration file content here>
 
-2. OpenCode CLI (run permission or firewall rules):
-Action: opencode
-Instruction: <exact instruction to OpenCode script runner, e.g. "chmod 600 app_config.json">
+2. Vyber CLI (run permission or firewall rules):
+Action: vyber
+Instruction: <exact instruction to Vyber script runner, e.g. "chmod 600 app_config.json">
 
 Your response must follow this format:
 Thought: <reasoning explaining why you are applying this patch>
-Action: <edit or opencode>
+Action: <edit or vyber>
 File/Instruction: <file path or command instruction>
 [Content: if editing]
 <content>
@@ -657,7 +654,6 @@ File/Instruction: <file path or command instruction>
 Once the vulnerability is fully patched and the system is secured, output "MITIGATION_COMPLETE".
 """
         
-        # Multi-turn defense healing loop
         for turn in range(2):
             yield (red_terminal, blue_terminal + "...Thinking...", "Defense Agent formulating patch...")
             response = model_server.generate.remote(blue_prompt)
@@ -675,7 +671,6 @@ Once the vulnerability is fully patched and the system is secured, output "MITIG
                     if "MITIGATION_COMPLETE" in content:
                         content = content.split("MITIGATION_COMPLETE")[0].strip()
                 except Exception:
-                    # Fallback file paths
                     filepath = os.path.join(base_dir, "app_config.json") if scenario_id == 1 else (os.path.join(base_dir, "db_settings.yaml") if scenario_id == 2 else os.path.join(base_dir, "pipeline_config.json"))
                     content = "{}"
                     
@@ -694,18 +689,18 @@ Once the vulnerability is fully patched and the system is secured, output "MITIG
                 blue_prompt += f"\n{response}\nOutput: File edited successfully.\nNext Action:"
                 time.sleep(1.0)
                 
-            elif "Action: opencode" in response:
+            elif "Action: vyber" in response:
                 try:
                     instruction = response.split("Instruction:")[1].strip()
                 except Exception:
                     instruction = "chmod 600 app_config.json"
                     
                 blue_terminal += f"Reasoning : {thought}\n"
-                blue_terminal += f"Tool Call : OpenCode - {instruction}\n"
+                blue_terminal += f"Tool Call : Vyber - {instruction}\n"
                 yield (red_terminal, blue_terminal + "...Executing...", "Applying hardening rule...")
                 
                 # Execute real tool/chmod command inside container
-                out = opencode_run(instruction, base_dir)
+                out = vyber_run(instruction, base_dir)
                 blue_terminal += f"Status    : Hardening rule executed. Output: {out}\n"
                 blue_terminal += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                 yield (red_terminal, blue_terminal, "Hardening in progress...")
@@ -731,14 +726,14 @@ Once the vulnerability is fully patched and the system is secured, output "MITIG
     red_terminal += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
     red_terminal += "Reasoning : Re-running original exploit scan to verify security boundary.\n"
     if scenario_id == 1:
-        red_terminal += "Tool Call : OpenCode CLI - Read app_config.json\n"
-        out = opencode_run("Read app_config.json", base_dir)
+        red_terminal += "Tool Call : Vyber CLI - Read app_config.json\n"
+        out = vyber_run("Read app_config.json", base_dir)
     elif scenario_id == 2:
-        red_terminal += "Tool Call : OpenCode CLI - Read db_settings.yaml\n"
-        out = opencode_run("Read db_settings.yaml", base_dir)
+        red_terminal += "Tool Call : Vyber CLI - Read db_settings.yaml\n"
+        out = vyber_run("Read db_settings.yaml", base_dir)
     else:
-        red_terminal += "Tool Call : OpenCode CLI - Read pipeline_config.json\n"
-        out = opencode_run("Read pipeline_config.json", base_dir)
+        red_terminal += "Tool Call : Vyber CLI - Read pipeline_config.json\n"
+        out = vyber_run("Read pipeline_config.json", base_dir)
         
     red_terminal += f"Output    :\n{out}\n"
     if is_secure:

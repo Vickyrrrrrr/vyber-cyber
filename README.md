@@ -43,7 +43,7 @@ The simulator features 3 distinct target vulnerability environments:
 
 ## Technical Stack & Infrastructure
 * **Compute Backend**: Modal (`modal.App`) executing on demand on serverless GPU and CPU sandboxes.
-* **Agent Tool Execution**: OpenCode CLI integrated during container image build, running in headless non-interactive script mode to execute bash commands and file edits.
+* **Agent Tool Execution**: Vyber CLI integrated during container image build, running in headless non-interactive script mode to execute bash commands and file edits.
 * **Designated Models**: Configured for lightweight, highly-optimized open-weights models ($\le$ 32B parameters) like **`Qwen/Qwen2.5-7B-Instruct`** and **`meta-llama/Llama-3.2-3B-Instruct`** for fast, local inference.
 * **UI Dashboard**: Built with Gradio (`gr.Blocks`) utilizing Python generators (`yield`) to stream terminal outputs character-by-character in real-time, preventing network timeout issues.
 
