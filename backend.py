@@ -183,7 +183,7 @@ image = (
         "curl -fsSL https://opencode.ai/install | bash",
         "ln -s /usr/local/bin/opencode /usr/local/bin/vyber"
     )
-    .pip_install("openai", "gradio", "pyyaml")
+    .pip_install("vllm", "openai", "gradio", "pyyaml")
 )
 
 # Host the Serverless LLM Worker
@@ -211,15 +211,15 @@ class ModelServer:
             self.vllm_available = False
 
     @modal.method()
-    def generate(self, prompt: str) -> str:
+    def generate(self, prompt: str, api_key: str = None) -> str:
         if self.vllm_available:
             outputs = self.llm.generate([prompt], self.sampling_params)
             return outputs[0].outputs[0].text
         else:
-            return self._fallback_generate(prompt)
+            return self._fallback_generate(prompt, api_key)
 
-    def _fallback_generate(self, prompt: str) -> str:
-        api_key = os.environ.get("OPENAI_API_KEY")
+    def _fallback_generate(self, prompt: str, api_key: str = None) -> str:
+        api_key = api_key or os.environ.get("OPENAI_API_KEY")
         if api_key:
             from openai import OpenAI
             client = OpenAI(api_key=api_key)
@@ -288,7 +288,7 @@ def vyber_run(instruction: str, workspace_dir: str) -> str:
 
 # Stateful Execution Duel function
 @app.function(image=image)
-def run_duel_stream(scenario_id: int) -> Generator[tuple[str, str, str], None, None]:
+def run_duel_stream(scenario_id: int, openai_api_key: str = None) -> Generator[tuple[str, str, str], None, None]:
     """
     Executes the multi-turn duel loop inside a single continuous stateful container.
     Yields (red_terminal, blue_terminal, banner_text) to the Gradio frontend.
@@ -579,7 +579,7 @@ Begin reconnaissance.
         exploit_plan_txt = ""
         for turn in range(2):
             yield (red_terminal + "...Thinking...", blue_terminal, "Attack Reconnaissance active...")
-            response = model_server.generate.remote(red_prompt)
+            response = model_server.generate.remote(red_prompt, openai_api_key)
             
             thought = ""
             instruction = ""
@@ -617,7 +617,7 @@ Begin reconnaissance.
                 
         if not exploit_plan_txt:
             red_prompt += "\nFormat your final exploit strategy as a JSON block now."
-            response = model_server.generate.remote(red_prompt)
+            response = model_server.generate.remote(red_prompt, openai_api_key)
             if "```json" in response:
                 exploit_plan_txt = response.split("```json")[1].split("```")[0].strip()
             else:
@@ -664,7 +664,7 @@ Once the vulnerability is fully patched and the system is secured, output "MITIG
         
         for turn in range(2):
             yield (red_terminal, blue_terminal + "...Thinking...", "Defense Agent formulating patch...")
-            response = model_server.generate.remote(blue_prompt)
+            response = model_server.generate.remote(blue_prompt, openai_api_key)
             
             thought = ""
             action = ""

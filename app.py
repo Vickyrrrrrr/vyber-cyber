@@ -103,11 +103,12 @@ def launch_duel(scenario_name):
     scenario_id = scenario_map.get(scenario_name, 1)
     
     # Connect securely to active Modal application
+    openai_api_key = os.environ.get("OPENAI_API_KEY", "")
     try:
         # Lookup the remote function using modern from_name
         f = modal.Function.from_name("cyber-defense-range", "run_duel_stream")
         # Call generator to stream outputs character-by-character
-        for red_out, blue_out, banner_txt in f.remote_gen(scenario_id):
+        for red_out, blue_out, banner_txt in f.remote_gen(scenario_id, openai_api_key=openai_api_key):
             yield red_out, blue_out, f"Status: {banner_txt}"
     except Exception as e:
         print(f"Modal Remote Gen lookup failed: {e}. Falling back to local execution.")
@@ -116,7 +117,7 @@ def launch_duel(scenario_name):
             # We import here to avoid circular dependencies
             from backend import run_duel_stream
             # Execute generator locally (directly calls the function logic)
-            for red_out, blue_out, banner_txt in run_duel_stream.local(scenario_id):
+            for red_out, blue_out, banner_txt in run_duel_stream.local(scenario_id, openai_api_key=openai_api_key):
                 yield red_out, blue_out, f"Status: {banner_txt}"
         except Exception as local_err:
             error_msg = f"Red Team Agent connection error:\n{str(e)}\nLocal Fallback error:\n{str(local_err)}"
