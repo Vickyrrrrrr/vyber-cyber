@@ -1,5 +1,6 @@
 import os
 import time
+import html
 import gradio as gr
 import modal
 
@@ -138,46 +139,6 @@ html, body {
     background: transparent !important;
     border: none !important;
     scroll-margin-top: 18px !important;
-}
-
-#operation-terminal textarea,
-#operation-terminal textarea:focus,
-#operation-terminal textarea:disabled,
-#operation-terminal textarea[readonly],
-.dark #operation-terminal textarea,
-.dark #operation-terminal textarea:focus,
-.dark #operation-terminal textarea:disabled,
-.dark #operation-terminal textarea[readonly] {
-    background-color: #111312 !important;
-    background: #111312 !important;
-    border: 1px solid #25221f !important;
-    border-left: 3px solid #802f1a !important;
-    border-radius: 4px !important;
-    box-shadow: none !important;
-    color: #f0e7d8 !important;
-    -webkit-text-fill-color: #f0e7d8 !important;
-    opacity: 1 !important;
-    font-family: 'JetBrains Mono', 'Fira Code', monospace !important;
-    font-size: 0.88rem !important;
-    font-weight: 400 !important;
-    line-height: 1.62 !important;
-    min-height: 520px !important;
-    max-height: 68vh !important;
-    padding: 24px 28px !important;
-    resize: none !important;
-    text-shadow: none !important;
-    scroll-behavior: auto !important;
-}
-
-#operation-terminal .wrap,
-.dark #operation-terminal .wrap {
-    background-color: #111312 !important;
-    border-color: #25221f !important;
-}
-
-#operation-terminal label,
-#operation-terminal .block-label {
-    display: none !important;
 }
 
 .operation-shell {
@@ -517,7 +478,13 @@ def format_operation_trace(red_out, blue_out):
             blue,
         ])
 
-    return "\n".join(lines)
+    text = "\n".join(lines)
+    return (
+        "<div class='operation-shell'>"
+        "<pre style='color:#f0e7d8 !important;-webkit-text-fill-color:#f0e7d8 !important;'>"
+        + html.escape(text) +
+        "</pre></div>"
+    )
 
 def launch_duel(scenario_name):
     scenario_id = SCENARIO_MAP.get(scenario_name, 1)
@@ -582,13 +549,8 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="zinc", secondary_hue="zinc")
     status_banner = gr.Markdown("Status: Active sandbox waiting for execution command", elem_id="status-banner")
     
     gr.Markdown("### Operation Terminal")
-    operation_terminal = gr.Textbox(
+    operation_terminal = gr.HTML(
         value=format_operation_trace("", ""),
-        show_label=False,
-        lines=28,
-        max_lines=28,
-        autoscroll=True,
-        interactive=False,
         elem_id="operation-terminal",
         elem_classes=["operation-terminal"]
     )
