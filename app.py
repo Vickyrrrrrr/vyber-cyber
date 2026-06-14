@@ -1,6 +1,5 @@
 import os
 import time
-import html
 import gradio as gr
 import modal
 
@@ -141,6 +140,46 @@ html, body {
     scroll-margin-top: 18px !important;
 }
 
+#operation-terminal textarea,
+#operation-terminal textarea:focus,
+#operation-terminal textarea:disabled,
+#operation-terminal textarea[readonly],
+.dark #operation-terminal textarea,
+.dark #operation-terminal textarea:focus,
+.dark #operation-terminal textarea:disabled,
+.dark #operation-terminal textarea[readonly] {
+    background-color: #111312 !important;
+    background: #111312 !important;
+    border: 1px solid #25221f !important;
+    border-left: 3px solid #802f1a !important;
+    border-radius: 4px !important;
+    box-shadow: none !important;
+    color: #f0e7d8 !important;
+    -webkit-text-fill-color: #f0e7d8 !important;
+    opacity: 1 !important;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace !important;
+    font-size: 0.88rem !important;
+    font-weight: 400 !important;
+    line-height: 1.62 !important;
+    min-height: 520px !important;
+    max-height: 68vh !important;
+    padding: 24px 28px !important;
+    resize: none !important;
+    text-shadow: none !important;
+    scroll-behavior: auto !important;
+}
+
+#operation-terminal .wrap,
+.dark #operation-terminal .wrap {
+    background-color: #111312 !important;
+    border-color: #25221f !important;
+}
+
+#operation-terminal label,
+#operation-terminal .block-label {
+    display: none !important;
+}
+
 .operation-shell {
     background-color: #111312 !important;
     border: 1px solid #25221f !important;
@@ -248,8 +287,7 @@ button.primary span,
 .launch-button span,
 #launch-duel-button,
 #launch-duel-button button,
-#launch-duel-button span,
-#launch-duel-button * {
+#launch-duel-button span {
     background-color: #802f1a !important;
     color: #ffffff !important;
     -webkit-text-fill-color: #ffffff !important;
@@ -260,6 +298,12 @@ button.primary span,
     padding: 12px 24px !important;
     transition: all 0.15s ease-in-out !important;
     cursor: pointer !important;
+}
+
+#launch-duel-button *,
+.launch-button * {
+    color: #ffffff !important;
+    -webkit-text-fill-color: #ffffff !important;
 }
 
 .launch-button:hover,
@@ -392,45 +436,6 @@ h3 {
 }
 """
 
-js = """
-function trackVyberTerminal() {
-    const terminalRoot = document.querySelector("#operation-terminal") || document.querySelector(".operation-terminal");
-    const shell = terminalRoot ? terminalRoot.querySelector(".operation-shell") : document.querySelector(".operation-shell");
-    if (!shell) return;
-    shell.scrollTop = shell.scrollHeight;
-}
-
-function focusVyberTerminal() {
-    const terminalRoot = document.querySelector("#operation-terminal") || document.querySelector(".operation-terminal");
-    if (!terminalRoot) return;
-    terminalRoot.scrollIntoView({ behavior: "smooth", block: "start" });
-    requestAnimationFrame(trackVyberTerminal);
-}
-
-function bootVyberTerminalTracking() {
-    document.addEventListener("click", function(event) {
-        const launch = event.target.closest("#launch-duel-button");
-        if (!launch) return;
-        setTimeout(focusVyberTerminal, 120);
-        setTimeout(focusVyberTerminal, 700);
-    });
-
-    const observer = new MutationObserver(function() {
-        requestAnimationFrame(trackVyberTerminal);
-    });
-
-    observer.observe(document.body, {
-        childList: true,
-        characterData: true,
-        subtree: true
-    });
-
-    trackVyberTerminal();
-}
-
-bootVyberTerminalTracking();
-"""
-
 SCENARIO_CHOICES = [
     "Scenario 1: Insecure Configuration File (Secret Leak)",
     "Scenario 2: Exposed Database Port (Global Binding)",
@@ -512,13 +517,7 @@ def format_operation_trace(red_out, blue_out):
             blue,
         ])
 
-    text = "\n".join(lines)
-    return (
-        "<div class='operation-shell'>"
-        "<pre style='color:#f0e7d8 !important;-webkit-text-fill-color:#f0e7d8 !important;'>"
-        + html.escape(text) +
-        "</pre></div>"
-    )
+    return "\n".join(lines)
 
 def launch_duel(scenario_name):
     scenario_id = SCENARIO_MAP.get(scenario_name, 1)
@@ -545,10 +544,10 @@ def launch_duel(scenario_name):
                 yield format_operation_trace(red_out, blue_out), f"Status: {clean_console(banner_txt)}"
         except Exception as local_err:
             error_msg = f"Red Team Agent connection error:\n{str(e)}\nLocal Fallback error:\n{str(local_err)}"
-            yield clean_console(error_msg), "Status: Connection Error"
+            yield format_operation_trace(clean_console(error_msg), ""), "Status: Connection Error"
 
 # Build Gradio UI
-with gr.Blocks(theme=gr.themes.Default(primary_hue="zinc", secondary_hue="zinc"), css=css, js=js) as demo:
+with gr.Blocks(theme=gr.themes.Default(primary_hue="zinc", secondary_hue="zinc"), css=css) as demo:
     gr.HTML(
         "<section class='hero'>"
         "<p class='hero-eyebrow'>Autonomous Cyber-Range</p>"
@@ -583,8 +582,13 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="zinc", secondary_hue="zinc")
     status_banner = gr.Markdown("Status: Active sandbox waiting for execution command", elem_id="status-banner")
     
     gr.Markdown("### Operation Terminal")
-    operation_terminal = gr.HTML(
+    operation_terminal = gr.Textbox(
         value=format_operation_trace("", ""),
+        show_label=False,
+        lines=28,
+        max_lines=28,
+        autoscroll=True,
+        interactive=False,
         elem_id="operation-terminal",
         elem_classes=["operation-terminal"]
     )
@@ -593,7 +597,8 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="zinc", secondary_hue="zinc")
     launch_btn.click(
         fn=launch_duel,
         inputs=scenario_dropdown,
-        outputs=[operation_terminal, status_banner]
+        outputs=[operation_terminal, status_banner],
+        scroll_to_output=True
     )
 
 if __name__ == "__main__":
