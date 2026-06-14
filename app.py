@@ -76,10 +76,10 @@ html, body {
 .gradio-container {
     background-color: #faf8f5 !important;
     border: none !important;
-    max-width: 95% !important;
-    width: 95% !important;
-    margin: 20px auto !important;
-    padding: 24px !important;
+    max-width: 1180px !important;
+    width: calc(100% - 48px) !important;
+    margin: 14px auto !important;
+    padding: 18px 0 28px 0 !important;
     box-shadow: none !important;
 }
 
@@ -278,6 +278,27 @@ button.primary:hover {
     -webkit-text-fill-color: #ffffff !important;
 }
 
+.command-bar {
+    align-items: end !important;
+    gap: 10px !important;
+    margin: 0 0 10px 0 !important;
+}
+
+.scenario-selector,
+.scenario-selector > *,
+.scenario-selector .wrap {
+    background: transparent !important;
+    border-radius: 4px !important;
+}
+
+.scenario-selector {
+    min-width: 320px !important;
+}
+
+.command-bar button {
+    min-height: 42px !important;
+}
+
 .launch-button:focus,
 .launch-button button:focus,
 button.primary:focus {
@@ -297,10 +318,10 @@ button.primary:disabled {
 .live-button,
 .live-button button,
 .live-button span {
-    background-color: #ffffff !important;
-    color: #802f1a !important;
-    -webkit-text-fill-color: #802f1a !important;
-    border: 1px solid #c99584 !important;
+    background-color: transparent !important;
+    color: #594c43 !important;
+    -webkit-text-fill-color: #594c43 !important;
+    border: 1px solid #e6dfd5 !important;
     border-radius: 4px !important;
     font-weight: 500 !important;
     font-family: 'Inter', sans-serif !important;
@@ -310,74 +331,54 @@ button.primary:disabled {
 .live-button:hover,
 .live-button:hover button {
     background-color: #f7f2eb !important;
-    border-color: #802f1a !important;
+    border-color: #d7cab9 !important;
 }
 
 .hero {
     text-align: center !important;
-    max-width: 860px !important;
-    margin: 2px auto 30px auto !important;
+    max-width: 760px !important;
+    margin: 0 auto 24px auto !important;
     padding: 4px 0 0 0 !important;
 }
 
 .hero-eyebrow {
     color: #802f1a !important;
     font-family: 'Inter', sans-serif !important;
-    font-size: 0.78rem !important;
+    font-size: 0.72rem !important;
     font-weight: 700 !important;
     letter-spacing: 0 !important;
-    margin: 0 0 8px 0 !important;
+    margin: 0 0 6px 0 !important;
     text-transform: uppercase !important;
 }
 
 .hero h1 {
     color: #231f1d !important;
     font-family: 'Playfair Display', 'Georgia', serif !important;
-    font-size: 3rem !important;
+    font-size: 2.65rem !important;
     line-height: 1.05 !important;
     letter-spacing: 0 !important;
-    margin: 0 0 14px 0 !important;
+    margin: 0 0 10px 0 !important;
     font-weight: 700 !important;
 }
 
 .hero-lead {
     color: #3a332f !important;
     font-family: 'Inter', sans-serif !important;
-    font-size: 1.04rem !important;
-    line-height: 1.62 !important;
-    max-width: 720px !important;
-    margin: 0 auto 18px auto !important;
-}
-
-.hero-meta {
-    display: flex !important;
-    justify-content: center !important;
-    align-items: center !important;
-    gap: 8px !important;
-    flex-wrap: wrap !important;
-}
-
-.hero-meta span {
-    background: #f2ece4 !important;
-    border: 1px solid #e6dfd5 !important;
-    border-radius: 999px !important;
-    color: #594c43 !important;
-    font-family: 'Inter', sans-serif !important;
-    font-size: 0.82rem !important;
-    font-weight: 600 !important;
-    line-height: 1 !important;
-    padding: 8px 11px !important;
+    font-size: 0.98rem !important;
+    line-height: 1.5 !important;
+    max-width: 640px !important;
+    margin: 0 auto !important;
 }
 
 /* Status Banner - Warm gray/beige banner with high contrast text */
 #status-banner {
-    background-color: #f2ece4 !important;
-    border: 1px solid #e6dfd5 !important;
+    background-color: transparent !important;
+    border: none !important;
     border-radius: 4px !important;
-    padding: 14px 20px !important;
+    padding: 6px 0 10px 0 !important;
     font-family: 'Inter', sans-serif !important;
-    font-size: 0.95rem !important;
-    font-weight: 600 !important;
+    font-size: 0.86rem !important;
+    font-weight: 500 !important;
 }
 
 #status-banner, #status-banner p, #status-banner span {
@@ -385,15 +386,15 @@ button.primary:disabled {
 }
 
 .lab-note {
-    background-color: #f7f2eb !important;
-    border: 1px solid #e6dfd5 !important;
-    border-radius: 4px !important;
-    padding: 12px 16px !important;
-    margin: 4px 0 16px 0 !important;
+    background-color: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    margin: 0 0 10px 0 !important;
     color: #594c43 !important;
     font-family: 'Inter', sans-serif !important;
-    font-size: 0.88rem !important;
-    line-height: 1.55 !important;
+    font-size: 0.82rem !important;
+    line-height: 1.45 !important;
 }
 
 .lab-note strong {
@@ -406,7 +407,8 @@ h3 {
     font-family: 'Playfair Display', serif !important;
     color: #231f1d !important;
     font-weight: 700 !important;
-    margin-top: 10px !important;
+    margin-top: 4px !important;
+    margin-bottom: 10px !important;
 }
 
 .block-label, .gr-label {
@@ -706,33 +708,27 @@ def launch_duel(scenario_name):
 with gr.Blocks(theme=gr.themes.Default(primary_hue="zinc", secondary_hue="zinc"), css=css) as demo:
     gr.HTML(
         "<section class='hero'>"
-        "<p class='hero-eyebrow'>Autonomous Cyber-Range</p>"
+        "<p class='hero-eyebrow'>Autonomous Cyber Range</p>"
         "<h1>Vyber Duel</h1>"
         "<p class='hero-lead'>"
-        "Red finds the exploit, Blue patches the code, and Red replays the same attack to verify the fix inside an isolated sandbox."
+        "A controlled red-to-blue repair loop for vulnerable server patterns."
         "</p>"
-        "<div class='hero-meta'>"
-        "<span>Fine-tuned 7B security model</span>"
-        "<span>llama.cpp on Modal GPU</span>"
-        "<span>First run warms hardware and loads GGUF weights</span>"
-        "</div>"
         "</section>"
     )
     
-    with gr.Row():
+    with gr.Row(elem_classes=["command-bar"]):
         scenario_dropdown = gr.Dropdown(
             choices=SCENARIO_CHOICES,
             value="Scenario 1: Insecure Configuration File (Secret Leak)",
-            label="Target Cyber-Range Scenario",
+            label="Scenario",
             elem_classes=["scenario-selector"]
         )
-        demo_btn = gr.Button("Run Demo Replay", variant="primary", elem_id="launch-duel-button", elem_classes=["launch-button"])
-        launch_btn = gr.Button("Launch Live GPU Duel", variant="secondary", elem_classes=["live-button"])
+        demo_btn = gr.Button("Run Demo Replay", variant="primary", elem_id="launch-duel-button", elem_classes=["launch-button"], scale=0, min_width=170)
+        launch_btn = gr.Button("Live GPU Duel", variant="secondary", elem_classes=["live-button"], scale=0, min_width=140)
 
     gr.HTML(
         "<div class='lab-note'>"
-        "<strong>Public demo mode:</strong> Run Demo Replay is instant and uses no GPU credits. "
-        "Launch Live GPU Duel runs the full Modal-backed agent loop and is queued to protect the demo budget."
+        "Demo replay is instant. Live GPU runs the full Modal agent loop and may queue."
         "</div>"
     )
         
