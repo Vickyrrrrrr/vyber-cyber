@@ -239,9 +239,14 @@ html, body {
 .blue-terminal textarea::-webkit-scrollbar-thumb { background: #1e4a6e; border-radius: 3px; }
 
 /* Premium Minimalist Button - Rust background */
-.launch-button, button.primary {
+.launch-button,
+.launch-button button,
+button.primary,
+button.primary span,
+.launch-button span {
     background-color: #802f1a !important;
     color: #ffffff !important;
+    -webkit-text-fill-color: #ffffff !important;
     border: 1px solid #802f1a !important;
     border-radius: 4px !important;
     font-weight: 500 !important;
@@ -251,9 +256,29 @@ html, body {
     cursor: pointer !important;
 }
 
-.launch-button:hover, button.primary:hover {
+.launch-button:hover,
+.launch-button:hover button,
+button.primary:hover {
     background-color: #692412 !important;
     border-color: #692412 !important;
+    color: #ffffff !important;
+    -webkit-text-fill-color: #ffffff !important;
+}
+
+.launch-button:focus,
+.launch-button button:focus,
+button.primary:focus {
+    outline: 2px solid #c99584 !important;
+    outline-offset: 2px !important;
+}
+
+.launch-button:disabled,
+.launch-button button:disabled,
+button.primary:disabled {
+    background-color: #a88478 !important;
+    border-color: #a88478 !important;
+    color: #fff8f3 !important;
+    -webkit-text-fill-color: #fff8f3 !important;
 }
 
 /* Status Banner - Warm gray/beige banner with high contrast text */
