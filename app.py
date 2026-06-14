@@ -7,6 +7,33 @@ import modal
 css = """
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:ital,wght@0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap');
 
+/* Force consistent CSS variables across both light and dark modes to prevent day/night glitches */
+:root, html, body, .gradio-container, 
+.dark, html.dark, .dark body, .dark .gradio-container {
+    --body-background-fill: #faf8f5 !important;
+    --body-text-color: #231f1d !important;
+    --background-fill-primary: #faf8f5 !important;
+    --background-fill-secondary: #f2ece4 !important;
+    --border-color-primary: #e6dfd5 !important;
+    --border-color-secondary: #e6dfd5 !important;
+    --input-background-fill: #ffffff !important;
+    --input-border-color: #e6dfd5 !important;
+    --input-text-color: #231f1d !important;
+    --block-background-fill: #ffffff !important;
+    --block-border-color: #e6dfd5 !important;
+    --block-title-text-color: #231f1d !important;
+    --block-label-text-color: #594c43 !important;
+    --button-primary-background-fill: #802f1a !important;
+    --button-primary-background-fill-hover: #692412 !important;
+    --button-primary-text-color: #ffffff !important;
+    --button-primary-border-color: #802f1a !important;
+    --button-secondary-background-fill: #ffffff !important;
+    --button-secondary-text-color: #231f1d !important;
+    --button-secondary-border-color: #e6dfd5 !important;
+    background-color: #faf8f5 !important;
+    color: #231f1d !important;
+}
+
 body {
     background-color: #faf8f5 !important;
     color: #231f1d !important;
@@ -24,16 +51,22 @@ body {
     box-shadow: none !important;
 }
 
-/* Dropdown and Controls */
-.gr-dropdown, .gr-input, .gr-box {
+/* Ensure dropdowns, select options, and textboxes remain clean white with dark text */
+.gr-dropdown, .gr-input, .gr-box, select, input, textarea {
     background-color: #ffffff !important;
     border: 1px solid #e6dfd5 !important;
     border-radius: 4px !important;
     color: #231f1d !important;
 }
 
-/* Terminals Styling - Classy dark terminal box on cream page */
-.red-terminal textarea, .blue-terminal textarea {
+.dark select, .dark input, .dark .gr-dropdown {
+    background-color: #ffffff !important;
+    color: #231f1d !important;
+}
+
+/* Terminals Styling - Classy dark terminal box on cream page for both light/dark wrapper states */
+.red-terminal textarea, .blue-terminal textarea,
+.dark .red-terminal textarea, .dark .blue-terminal textarea {
     background-color: #181615 !important;
     border: 1px solid #e6dfd5 !important;
     border-radius: 4px !important;
@@ -51,7 +84,7 @@ body {
 }
 
 /* Premium Minimalist Button - Rust background */
-.launch-button {
+.launch-button, button.primary {
     background-color: #802f1a !important;
     color: #ffffff !important;
     border: 1px solid #802f1a !important;
@@ -63,12 +96,12 @@ body {
     cursor: pointer !important;
 }
 
-.launch-button:hover {
+.launch-button:hover, button.primary:hover {
     background-color: #692412 !important;
     border-color: #692412 !important;
 }
 
-/* Status Banner - Warm gray/beige banner */
+/* Status Banner - Warm gray/beige banner with high contrast text */
 #status-banner {
     background-color: #f2ece4 !important;
     border: 1px solid #e6dfd5 !important;
@@ -76,8 +109,11 @@ body {
     padding: 14px 20px !important;
     font-family: 'Inter', sans-serif !important;
     font-size: 0.95rem !important;
-    font-weight: 500 !important;
-    color: #594c43 !important;
+    font-weight: 600 !important;
+}
+
+#status-banner, #status-banner p, #status-banner span {
+    color: #802f1a !important;
 }
 
 /* Labels and Markdown titles */
@@ -86,6 +122,14 @@ h3 {
     color: #231f1d !important;
     font-weight: 700 !important;
     margin-top: 10px !important;
+}
+
+.block-label, .gr-label {
+    color: #594c43 !important;
+    font-family: 'Inter', sans-serif !important;
+    font-size: 0.75rem !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
 }
 """
 
