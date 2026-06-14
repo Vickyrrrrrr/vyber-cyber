@@ -12,159 +12,221 @@ import modal
 class CyberRangeScenarios:
     @staticmethod
     def init_scenario(scenario_id: int, base_dir: str):
-        """
-        Initializes the files representing the mock vulnerabilities in the base directory.
-        """
         os.makedirs(base_dir, exist_ok=True)
-        
+
         if scenario_id == 1:
-            # Scenario 1 (Insecure Configuration File)
-            config_path = os.path.join(base_dir, "app_config.json")
-            config_data = {
-                "app_name": "SecureCorpGateway",
-                "database_url": "postgresql://admin:super_secret_master_password_123@10.0.1.15:5432/production",
-                "api_key": "hf_live_key_987654321",
-                "debug": True
-            }
-            with open(config_path, "w") as f:
-                json.dump(config_data, f, indent=4)
-            
-            with open(os.path.join(base_dir, "readme.txt"), "w") as f:
-                f.write("TARGET CONFIGURATION VULNERABILITY\n")
-                f.write("Vulnerability: app_config.json contains hardcoded plain-text API keys and database credentials.\n")
-                f.write("Action Required: Identify the plain-text secrets and secure the configuration.\n")
+            # VULN 1: Hardcoded secrets in app_config.json
+            with open(os.path.join(base_dir, "app_config.json"), "w") as f:
+                json.dump({
+                    "app_name": "SecureCorpGateway",
+                    "database_url": "postgresql://admin:super_secret_master_password_123@10.0.1.15:5432/production",
+                    "api_key": "hf_live_key_987654321",
+                    "debug": True
+                }, f, indent=4)
+
+            # VULN 2: AWS credentials hardcoded in server.env
+            with open(os.path.join(base_dir, "server.env"), "w") as f:
+                f.write("AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n")
+                f.write("AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY\n")
+                f.write("STRIPE_SECRET_KEY=sk_live_51HqXexAMPLEKEY\n")
+                f.write("NODE_ENV=production\n")
+
+            # VULN 3: World-readable deploy script with embedded password
+            with open(os.path.join(base_dir, "deploy.sh"), "w") as f:
+                f.write("#!/bin/bash\n")
+                f.write("# Deployment script\n")
+                f.write("DB_PASS=super_secret_master_password_123\n")
+                f.write("psql -U admin -h 10.0.1.15 -p 5432 production\n")
+            os.chmod(os.path.join(base_dir, "deploy.sh"), 0o777)  # world-readable/executable
 
         elif scenario_id == 2:
-            # Scenario 2 (Exposed Database Port)
-            db_config_path = os.path.join(base_dir, "db_settings.yaml")
-            db_config = {
-                "database": {
-                    "engine": "postgresql",
-                    "host": "0.0.0.0",
-                    "port": 5432,
-                    "auth_required": False,
-                    "max_connections": 100
-                }
-            }
-            with open(db_config_path, "w") as f:
-                yaml.safe_dump(db_config, f, default_flow_style=False)
-            
-            with open(os.path.join(base_dir, "readme.txt"), "w") as f:
-                f.write("TARGET DATABASE PORT VULNERABILITY\n")
-                f.write("Vulnerability: db_settings.yaml exposes the database to all interfaces (0.0.0.0) without authentication.\n")
-                f.write("Action Required: Restrict database binding to local interface and enable authentication.\n")
+            # VULN 1: DB bound to 0.0.0.0, no auth
+            with open(os.path.join(base_dir, "db_settings.yaml"), "w") as f:
+                yaml.safe_dump({
+                    "database": {
+                        "engine": "postgresql",
+                        "host": "0.0.0.0",
+                        "port": 5432,
+                        "auth_required": False,
+                        "max_connections": 100
+                    }
+                }, f, default_flow_style=False)
+
+            # VULN 2: nginx.conf allows weak SSL protocols
+            with open(os.path.join(base_dir, "nginx.conf"), "w") as f:
+                f.write("server {\n")
+                f.write("    listen 443 ssl;\n")
+                f.write("    ssl_protocols SSLv2 SSLv3 TLSv1;\n")  # weak
+                f.write("    ssl_ciphers ALL:!ADH:!EXPORT56:RC4+RSA:+HIGH:+MEDIUM:+LOW:+SSLv2:+EXP;\n")
+                f.write("    ssl_verify_client off;\n")
+                f.write("}\n")
+
+            # VULN 3: firewall_rules.json — all ports open inbound
+            with open(os.path.join(base_dir, "firewall_rules.json"), "w") as f:
+                json.dump({
+                    "inbound_rules": [
+                        {"port": "0-65535", "protocol": "tcp", "source": "0.0.0.0/0", "action": "allow"},
+                        {"port": "0-65535", "protocol": "udp", "source": "0.0.0.0/0", "action": "allow"}
+                    ]
+                }, f, indent=4)
 
         elif scenario_id == 3:
-            # Scenario 3 (Unencrypted Communication Pipeline)
-            pipeline_path = os.path.join(base_dir, "pipeline_config.json")
-            pipeline_data = {
-                "pipeline": "UserBillingIngress",
-                "endpoint": "http://billing.securecorp.internal/stream",
-                "ssl_enabled": False,
-                "verify_certificates": False,
-                "encryption_cipher": "NONE"
-            }
-            with open(pipeline_path, "w") as f:
-                json.dump(pipeline_data, f, indent=4)
-                
-            log_path = os.path.join(base_dir, "traffic_stream.log")
-            log_content = (
-                "[INFO] Ingress traffic started on http://billing.securecorp.internal/stream\n"
-                "[DATA] Transmission payload: {\"user_id\": \"1042\", \"credit_card\": \"4111-2222-3333-4444\", \"cvv\": \"123\"}\n"
-                "[WARNING] SSL/TLS is disabled. Traffic is susceptible to sniffing!\n"
-            )
-            with open(log_path, "w") as f:
-                f.write(log_content)
-                
-            with open(os.path.join(base_dir, "readme.txt"), "w") as f:
-                f.write("TARGET UNENCRYPTED COMMUNICATION VULNERABILITY\n")
-                f.write("Vulnerability: pipeline_config.json runs HTTP without SSL and uses no encryption.\n")
-                f.write("Action Required: Force HTTPS endpoint, enable SSL, verify certificates, and enforce strong cipher (e.g., AES-256-GCM).\n")
-        
+            # VULN 1: pipeline_config.json — HTTP, no SSL, no cipher
+            with open(os.path.join(base_dir, "pipeline_config.json"), "w") as f:
+                json.dump({
+                    "pipeline": "UserBillingIngress",
+                    "endpoint": "http://billing.securecorp.internal/stream",
+                    "ssl_enabled": False,
+                    "verify_certificates": False,
+                    "encryption_cipher": "NONE"
+                }, f, indent=4)
+
+            # VULN 2: PII in plaintext log file
+            with open(os.path.join(base_dir, "traffic_stream.log"), "w") as f:
+                f.write("[INFO] Ingress traffic started on http://billing.securecorp.internal/stream\n")
+                f.write('[DATA] Transmission payload: {"user_id": "1042", "credit_card": "4111-2222-3333-4444", "cvv": "123"}\n')
+                f.write("[WARNING] SSL/TLS is disabled. Traffic is susceptible to sniffing!\n")
+
+            # VULN 3: api_gateway.json — no auth, no rate limit
+            with open(os.path.join(base_dir, "api_gateway.json"), "w") as f:
+                json.dump({
+                    "gateway": "BillingAPI",
+                    "auth_required": False,
+                    "rate_limit_rpm": 0,
+                    "cors_allow_all": True,
+                    "admin_endpoint_public": True
+                }, f, indent=4)
+
         else:
             raise ValueError(f"Unknown scenario ID: {scenario_id}")
 
     @staticmethod
-    def validate_scenario(scenario_id: int, base_dir: str) -> tuple[bool, str]:
+    def list_vulnerabilities(scenario_id: int, base_dir: str) -> list[dict]:
         """
-        Validates whether the vulnerability in the given base directory has been resolved.
+        Returns a list of dicts: {id, file, description, fixed: bool, detail: str}
+        This drives the loop-until-zero logic.
         """
+        vulns = []
+
         if scenario_id == 1:
-            config_path = os.path.join(base_dir, "app_config.json")
-            if not os.path.exists(config_path):
-                return False, "Vulnerability app_config.json file has been deleted or is missing."
+            # Vuln 1 — hardcoded secrets in app_config.json
             try:
-                with open(config_path, "r") as f:
-                    data = json.load(f)
-                
-                api_key = data.get("api_key", "")
-                db_url = data.get("database_url", "")
-                
-                if "hf_live_key_987654321" in api_key:
-                    return False, "Plain-text API key 'hf_live_key_987654321' is still present in app_config.json."
-                if "super_secret_master_password_123" in db_url:
-                    return False, "Plain-text password 'super_secret_master_password_123' is still present in database_url."
-                
-                if ("env" in api_key.lower() or "$" in api_key or api_key == "" or api_key != "hf_live_key_987654321") and \
-                   ("env" in db_url.lower() or "$" in db_url or "password" not in db_url):
-                    return True, "Infrastructure Secure - 100% Healed: Plaintext secrets removed and parameterized."
-                
-                return False, "Secrets changed, but configuration still contains static/hardcoded credentials instead of environment variables."
+                with open(os.path.join(base_dir, "app_config.json")) as f:
+                    d = json.load(f)
+                fixed = ("hf_live_key_987654321" not in d.get("api_key", "")) and \
+                        ("super_secret_master_password_123" not in d.get("database_url", ""))
+                detail = "parameterized" if fixed else "CWE-312: plaintext api_key + db password"
             except Exception as e:
-                return False, f"Failed to parse app_config.json: {str(e)}"
+                fixed, detail = False, str(e)
+            vulns.append({"id": "S1-V1", "file": "app_config.json", "cwe": "CWE-312",
+                          "description": "Hardcoded API key and DB password", "fixed": fixed, "detail": detail})
+
+            # Vuln 2 — AWS/Stripe keys in server.env
+            try:
+                content = open(os.path.join(base_dir, "server.env")).read()
+                fixed = ("AKIAIOSFODNN7EXAMPLE" not in content) and ("sk_live_51H" not in content)
+                detail = "rotated/parameterized" if fixed else "CWE-312: plaintext AWS + Stripe keys"
+            except Exception as e:
+                fixed, detail = False, str(e)
+            vulns.append({"id": "S1-V2", "file": "server.env", "cwe": "CWE-312",
+                          "description": "Hardcoded AWS + Stripe credentials", "fixed": fixed, "detail": detail})
+
+            # Vuln 3 — world-readable deploy.sh with embedded password
+            try:
+                content = open(os.path.join(base_dir, "deploy.sh")).read()
+                perms = oct(os.stat(os.path.join(base_dir, "deploy.sh")).st_mode)[-3:]
+                fixed = ("super_secret_master_password_123" not in content) and (perms in ["600", "700", "640"])
+                detail = f"secured (perms={perms})" if fixed else f"CWE-732: world-readable (perms={perms}) + embedded password"
+            except Exception as e:
+                fixed, detail = False, str(e)
+            vulns.append({"id": "S1-V3", "file": "deploy.sh", "cwe": "CWE-732",
+                          "description": "World-readable script with embedded DB password", "fixed": fixed, "detail": detail})
 
         elif scenario_id == 2:
-            db_config_path = os.path.join(base_dir, "db_settings.yaml")
-            if not os.path.exists(db_config_path):
-                return False, "Database settings file db_settings.yaml has been deleted or is missing."
+            # Vuln 1 — DB exposed on 0.0.0.0, no auth
             try:
-                with open(db_config_path, "r") as f:
-                    data = yaml.safe_load(f)
-                
-                db_data = data.get("database", {})
-                host = db_data.get("host", "")
-                auth_required = db_data.get("auth_required", False)
-                
-                if host == "0.0.0.0":
-                    return False, "Database host is still bound to 0.0.0.0 (exposed globally)."
-                if not auth_required:
-                    return False, "Database authentication is still disabled (auth_required = false)."
-                
-                if host in ["127.0.0.1", "localhost"] and auth_required is True:
-                    return True, "Infrastructure Secure - 100% Healed: DB bound to localhost with auth_required enabled."
-                
-                return False, f"Configuration modified but insecure: host={host}, auth_required={auth_required}."
+                with open(os.path.join(base_dir, "db_settings.yaml")) as f:
+                    d = yaml.safe_load(f)
+                db = d.get("database", {})
+                fixed = (db.get("host") not in ["0.0.0.0"]) and (db.get("auth_required", False) is True)
+                detail = "localhost + auth enabled" if fixed else f"CWE-284: host={db.get('host')} auth={db.get('auth_required')}"
             except Exception as e:
-                return False, f"Failed to parse db_settings.yaml: {str(e)}"
+                fixed, detail = False, str(e)
+            vulns.append({"id": "S2-V1", "file": "db_settings.yaml", "cwe": "CWE-284",
+                          "description": "DB bound to 0.0.0.0 with no authentication", "fixed": fixed, "detail": detail})
+
+            # Vuln 2 — nginx.conf weak SSL protocols
+            try:
+                content = open(os.path.join(base_dir, "nginx.conf")).read()
+                fixed = ("SSLv2" not in content) and ("SSLv3" not in content) and ("TLSv1.2" in content or "TLSv1.3" in content)
+                detail = "TLS 1.2/1.3 enforced" if fixed else "CWE-326: SSLv2/SSLv3/TLSv1 allowed"
+            except Exception as e:
+                fixed, detail = False, str(e)
+            vulns.append({"id": "S2-V2", "file": "nginx.conf", "cwe": "CWE-326",
+                          "description": "Weak SSL protocols (SSLv2/SSLv3/TLSv1) in nginx", "fixed": fixed, "detail": detail})
+
+            # Vuln 3 — firewall allows all inbound ports
+            try:
+                with open(os.path.join(base_dir, "firewall_rules.json")) as f:
+                    d = json.load(f)
+                rules = d.get("inbound_rules", [])
+                open_all = any(r.get("port") == "0-65535" and r.get("source") == "0.0.0.0/0" for r in rules)
+                fixed = not open_all
+                detail = "restricted" if fixed else "CWE-284: all ports open to 0.0.0.0/0"
+            except Exception as e:
+                fixed, detail = False, str(e)
+            vulns.append({"id": "S2-V3", "file": "firewall_rules.json", "cwe": "CWE-284",
+                          "description": "All inbound ports open to public (0.0.0.0/0)", "fixed": fixed, "detail": detail})
 
         elif scenario_id == 3:
-            pipeline_path = os.path.join(base_dir, "pipeline_config.json")
-            if not os.path.exists(pipeline_path):
-                return False, "Pipeline config file pipeline_config.json has been deleted or is missing."
+            # Vuln 1 — pipeline_config.json HTTP/no SSL
             try:
-                with open(pipeline_path, "r") as f:
-                    data = json.load(f)
-                
-                endpoint = data.get("endpoint", "")
-                ssl_enabled = data.get("ssl_enabled", False)
-                verify_certs = data.get("verify_certificates", False)
-                cipher = data.get("encryption_cipher", "NONE")
-                
-                if not endpoint.startswith("https://"):
-                    return False, "Endpoint protocol is still insecure (http instead of https)."
-                if not ssl_enabled:
-                    return False, "ssl_enabled is still false."
-                if not verify_certs:
-                    return False, "verify_certificates is still false."
-                if cipher == "NONE" or cipher == "":
-                    return False, "encryption_cipher is still disabled or NONE."
-                
-                return True, f"Infrastructure Secure - 100% Healed: SSL enabled, HTTPS endpoint enforced, and cipher set to {cipher}."
+                with open(os.path.join(base_dir, "pipeline_config.json")) as f:
+                    d = json.load(f)
+                fixed = d.get("endpoint", "").startswith("https://") and \
+                        d.get("ssl_enabled", False) and \
+                        d.get("verify_certificates", False) and \
+                        d.get("encryption_cipher", "NONE") not in ["NONE", ""]
+                detail = "HTTPS + SSL enforced" if fixed else "CWE-319: HTTP + ssl_enabled=false + cipher=NONE"
             except Exception as e:
-                return False, f"Failed to parse pipeline_config.json: {str(e)}"
-        
-        else:
-            return False, f"Invalid scenario ID {scenario_id}"
+                fixed, detail = False, str(e)
+            vulns.append({"id": "S3-V1", "file": "pipeline_config.json", "cwe": "CWE-319",
+                          "description": "Unencrypted HTTP pipeline, SSL disabled", "fixed": fixed, "detail": detail})
+
+            # Vuln 2 — PII in traffic_stream.log
+            try:
+                content = open(os.path.join(base_dir, "traffic_stream.log")).read()
+                fixed = ("4111-2222-3333-4444" not in content) and ("cvv" not in content.lower())
+                detail = "PII scrubbed" if fixed else "CWE-532: credit card + CVV in plaintext log"
+            except Exception as e:
+                fixed, detail = False, str(e)
+            vulns.append({"id": "S3-V2", "file": "traffic_stream.log", "cwe": "CWE-532",
+                          "description": "PII (credit card, CVV) leaked in plaintext log", "fixed": fixed, "detail": detail})
+
+            # Vuln 3 — api_gateway.json no auth, no rate limit
+            try:
+                with open(os.path.join(base_dir, "api_gateway.json")) as f:
+                    d = json.load(f)
+                fixed = d.get("auth_required", False) and \
+                        d.get("rate_limit_rpm", 0) > 0 and \
+                        not d.get("admin_endpoint_public", True)
+                detail = "auth + rate limit enforced" if fixed else "CWE-306: no auth, no rate limit, public admin"
+            except Exception as e:
+                fixed, detail = False, str(e)
+            vulns.append({"id": "S3-V3", "file": "api_gateway.json", "cwe": "CWE-306",
+                          "description": "API gateway: no auth, no rate limit, public admin endpoint", "fixed": fixed, "detail": detail})
+
+        return vulns
+
+    @staticmethod
+    def validate_scenario(scenario_id: int, base_dir: str) -> tuple[bool, str]:
+        vulns = CyberRangeScenarios.list_vulnerabilities(scenario_id, base_dir)
+        remaining = [v for v in vulns if not v["fixed"]]
+        if not remaining:
+            return True, f"All {len(vulns)} vulnerabilities patched. System secure."
+        summary = ", ".join(f"{v['id']}({v['cwe']})" for v in remaining)
+        return False, f"{len(remaining)}/{len(vulns)} vulnerabilities remain: {summary}"
+
 
 # ==========================================
 # Modal Serverless Setup
@@ -350,8 +412,28 @@ def run_duel_stream(scenario_id: int, openai_api_key: str = None) -> Generator[t
     blue_terminal += f"  [{ts()}] status     : waiting for threat signal\n"
 
     yield (red_terminal, blue_terminal, "Sandbox initialized — agents online")
+    time.sleep(0.5)
+
+    # Deploy vulnerable files into the sandbox
+    CyberRangeScenarios.init_scenario(scenario_id, base_dir)
+
+    # Show initial vuln scoreboard
+    all_vulns = CyberRangeScenarios.list_vulnerabilities(scenario_id, base_dir)
+    red_terminal += fmt_section(f"THREAT SURFACE  {len(all_vulns)} VULNERABILITIES PLANTED")
+    for v in all_vulns:
+        red_terminal += f"  [OPEN]  {v['id']}  {v['cwe']}  {v['file']}\n"
+        red_terminal += f"          {v['description']}\n"
+    red_terminal += "\n"
+
+    blue_terminal += fmt_section(f"SOC ALERT  {len(all_vulns)} ACTIVE THREATS DETECTED")
+    for v in all_vulns:
+        blue_terminal += f"  [VULN]  {v['id']}  {v['cwe']}  {v['file']}\n"
+        blue_terminal += f"          {v['description']}\n"
+    blue_terminal += "\n"
+
+    yield (red_terminal, blue_terminal, f"Threat surface mapped — {len(all_vulns)} vulnerabilities active")
     time.sleep(1.0)
-    
+
     # Check if we should use Simulated Agent mode (set to False for live AI execution)
     use_simulation = False
     
@@ -586,220 +668,199 @@ def run_duel_stream(scenario_id: int, openai_api_key: str = None) -> Generator[t
             
     else:
         # ==========================================
-        # Live AI Execution Loop (Dynamic reasoning)
+        # Live AI Loop — runs until 0 vulns remain
+        # Max 3 rounds to cap Modal GPU cost
         # ==========================================
         model_server = ModelServer()
-        
-        # --- Live Red Team Recon ---
-        red_terminal += "\n[ATTACK AGENT RECONNAISSANCE]\n"
-        red_terminal += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        
-        if scenario_id == 1:
-            target_description = "The target is a node configuration folder. File: app_config.json. Identify hardcoded secrets."
-        elif scenario_id == 2:
-            target_description = "The target is a database settings configuration. File: db_settings.yaml. Identify exposed ports and auth settings."
-        else:
-            target_description = "The target is a data communication pipeline config. File: pipeline_config.json, traffic_stream.log. Check for plain-text data transit."
-            
-        red_prompt = f"""[SYSTEM]
-You are an elite Red Team penetration tester. Your target is the '/tmp/sandbox/' directory inside this container.
-Goal: Run recon commands, identify the security vulnerability, and formulate a structured exploit strategy.
-You can execute non-interactive commands using the Vyber CLI. Format your actions exactly like this:
-Thought: <reasoning explaining what you want to achieve>
-Action: vyber
-Instruction: <exact instruction to Vyber script runner, e.g. "List files in sandbox" or "Read app_config.json" or "Run nmap scan on database configuration">
+        MAX_ROUNDS = 3
 
-Target Context: {target_description}
-
-Once you have identified the vulnerability and confirmed it, commit your exploit plan in this exact JSON format:
-```json
-{{
-  "vulnerability": "detailed description of what is exposed",
-  "exploit_plan": "step-by-step description of how to exploit this"
-}}
-```
-Do not output the JSON until you have executed commands and confirmed the data.
-
-Begin reconnaissance.
-"""
-        
-        exploit_plan_txt = ""
-        for turn in range(2):
-            yield (red_terminal + "...Thinking...", blue_terminal, "Attack Reconnaissance active...")
-            response = model_server.generate.remote(red_prompt, openai_api_key)
-            
-            thought = ""
-            instruction = ""
-            
-            if "Thought:" in response:
-                thought = response.split("Thought:")[1].split("Action:")[0].strip()
-            
-            if "Action: vyber" in response:
-                try:
-                    instruction = response.split("Instruction:")[1].strip()
-                    if "```json" in instruction:
-                        instruction = instruction.split("```json")[0].strip()
-                except Exception:
-                    instruction = "List contents of directory"
-                    
-            if instruction:
-                red_terminal += f"Reasoning : {thought}\n"
-                red_terminal += f"Tool Call : Vyber - {instruction}\n"
-                yield (red_terminal + "...Executing...", blue_terminal, "Executing Recon command...")
-                
-                # Execute real tool command inside container
-                out = vyber_run(instruction, base_dir)
-                red_terminal += f"Output    :\n{out}\n"
-                red_terminal += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                yield (red_terminal, blue_terminal, "Attack Reconnaissance active...")
-                
-                red_prompt += f"\n{response}\nOutput:\n{out}\nNext Step:"
-                time.sleep(1.0)
-            elif "```json" in response:
-                exploit_plan_txt = response.split("```json")[1].split("```")[0].strip()
+        for round_num in range(1, MAX_ROUNDS + 1):
+            remaining = [v for v in CyberRangeScenarios.list_vulnerabilities(scenario_id, base_dir) if not v["fixed"]]
+            if not remaining:
                 break
-            else:
-                exploit_plan_txt = response
-                break
-                
-        if not exploit_plan_txt:
-            red_prompt += "\nFormat your final exploit strategy as a JSON block now."
-            response = model_server.generate.remote(red_prompt, openai_api_key)
-            if "```json" in response:
-                exploit_plan_txt = response.split("```json")[1].split("```")[0].strip()
-            else:
-                exploit_plan_txt = response
-                
-        red_terminal += f"\n[VULNERABILITY IDENTIFIED]\n"
-        red_terminal += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        red_terminal += f"Action    : Committing Exploit Strategy JSON:\n{exploit_plan_txt}\n"
-        yield (red_terminal, blue_terminal, "Target compromised. Exploit plan verified.")
-        time.sleep(2.0)
-        
-        # --- Live Blue Team SOC Analyst & Healing ---
-        blue_terminal += "\n[DEFENSE AGENT DETECTION & ANOMALY ALERT]\n"
-        blue_terminal += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        blue_terminal += "Trigger   : Intrusion telemetry triggered. Red Team exploit plan intercepted.\n"
-        yield (red_terminal, blue_terminal, "Anomaly detected. Initializing SOC analyst...")
-        
-        blue_prompt = f"""[SYSTEM]
-You are a Blue Team automated SOC analyst and self-healing security agent.
-An intruder has compromised the sandbox environment. Here is their exploit plan:
-{exploit_plan_txt}
 
-Your goal is to edit the target configuration file to remove the vulnerability (parameterize credentials, bind database to localhost, or enable SSL/ciphers).
-You have access to two tools:
-1. Edit File tool (replace/overwrite file content):
-Action: edit
-File: <exact file path, e.g. /tmp/sandbox/app_config.json>
-Content:
-<new configuration file content here>
+            # ── RED AGENT: scan all remaining vulns ──────────────────
+            red_terminal += fmt_section(f"ROUND {round_num}  RED AGENT  {len(remaining)} TARGETS")
+            red_terminal += f"  [{ts()}] scanning {len(remaining)} unpatched vulnerabilities\n"
+            for v in remaining:
+                red_terminal += f"  [{ts()}] target  {v['id']}  {v['file']}  ({v['cwe']})\n"
+            yield (red_terminal, blue_terminal, f"Round {round_num} — Red Agent scanning {len(remaining)} targets")
+            time.sleep(0.5)
 
-2. Vyber CLI (run permission or firewall rules):
-Action: vyber
-Instruction: <exact instruction to Vyber script runner, e.g. "chmod 600 app_config.json">
+            vuln_list_txt = "\n".join(
+                f"  {v['id']} | {v['cwe']} | {v['file']} | {v['description']}" for v in remaining
+            )
+            red_prompt = f"""You are an autonomous Red Team agent. Operate inside /tmp/sandbox/. Be concise and technical. No prose.
 
-Your response must follow this format:
-Thought: <reasoning explaining why you are applying this patch>
-Action: <edit or vyber>
-File/Instruction: <file path or command instruction>
-[Content: if editing]
-<content>
+UNPATCHED VULNERABILITIES ({len(remaining)} remaining):
+{vuln_list_txt}
 
-Once the vulnerability is fully patched and the system is secured, output "MITIGATION_COMPLETE".
-"""
-        
-        for turn in range(2):
-            yield (red_terminal, blue_terminal + "...Thinking...", "Defense Agent formulating patch...")
-            response = model_server.generate.remote(blue_prompt, openai_api_key)
-            
-            thought = ""
-            action = ""
-            
-            if "Thought:" in response:
-                thought = response.split("Thought:")[1].split("Action:")[0].strip()
-                
-            if "Action: edit" in response:
-                try:
-                    filepath = response.split("File:")[1].split("Content:")[0].strip()
-                    content = response.split("Content:")[1].strip()
-                    if "MITIGATION_COMPLETE" in content:
-                        content = content.split("MITIGATION_COMPLETE")[0].strip()
-                except Exception:
-                    filepath = os.path.join(base_dir, "app_config.json") if scenario_id == 1 else (os.path.join(base_dir, "db_settings.yaml") if scenario_id == 2 else os.path.join(base_dir, "pipeline_config.json"))
-                    content = "{}"
-                    
-                blue_terminal += f"Reasoning : {thought}\n"
-                blue_terminal += f"Action    : Use edit tool to rewrite {os.path.basename(filepath)}.\n"
-                yield (red_terminal, blue_terminal + "...Applying patch...", "Deploying self-healing code fix...")
-                
-                # Execute real edit/rewrite in sandbox container
-                with open(filepath, "w") as f:
-                    f.write(content)
-                    
-                blue_terminal += f"Output    : File updated successfully.\n[NEW CONFIGURATION applied]:\n{content}\n"
-                blue_terminal += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                yield (red_terminal, blue_terminal, "Mitigation in progress...")
-                
-                blue_prompt += f"\n{response}\nOutput: File edited successfully.\nNext Action:"
-                time.sleep(1.0)
-                
-            elif "Action: vyber" in response:
-                try:
-                    instruction = response.split("Instruction:")[1].strip()
-                except Exception:
-                    instruction = "chmod 600 app_config.json"
-                    
-                blue_terminal += f"Reasoning : {thought}\n"
-                blue_terminal += f"Tool Call : Vyber - {instruction}\n"
-                instruction = response.split("Instruction:")[1].strip()
-                blue_terminal += f"THINK : {thought}\n"
-                blue_terminal += f"EXEC  : Vyber - {instruction}\n"
-                yield (red_terminal, blue_terminal + "...Executing...", "Applying hardening rule...")
-                
-                out = vyber_run(instruction, base_dir)
-                blue_terminal += f"STDOUT: {out}\n"
-                blue_terminal += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                yield (red_terminal, blue_terminal, "Hardening in progress...")
-                
-                blue_prompt += f"\n{response}\nOutput:\n{out}\nNext Action:"
-                time.sleep(1.0)
-            elif "MITIGATION_COMPLETE" in response:
-                blue_terminal += f"THINK : {thought}\n"
-                blue_terminal += "STATUS: Mitigation finalized.\n"
-                break
-                
-        blue_terminal += "STATUS: Patch deployment finalized. Initiating validation verification scan.\n"
-        yield (red_terminal, blue_terminal, "Mitigation complete. Initiating validation verification scan...")
-        time.sleep(1.5)
-        
-    # 4. Final Validation check
-    is_secure, status_msg = CyberRangeScenarios.validate_scenario(scenario_id, base_dir)
-    
-    # Re-run exploit check output for Red Team
-    red_terminal += "\n[MITIGATION VERIFICATION]\n"
-    red_terminal += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-    red_terminal += "ACTION    : Re-running original exploit scan.\n"
-    if scenario_id == 1:
-        red_terminal += "Tool Call : Vyber CLI - Read app_config.json\n"
-        out = vyber_run("Read app_config.json", base_dir)
-    elif scenario_id == 2:
-        red_terminal += "Tool Call : Vyber CLI - Read db_settings.yaml\n"
-        out = vyber_run("Read db_settings.yaml", base_dir)
+TOOLS:
+  vyber list          — list directory
+  vyber read <file>   — read file content
+
+OUTPUT FORMAT (one action per response):
+THINK: <one-line reasoning>
+EXEC: vyber <instruction>
+
+After reading each vulnerable file, commit ALL findings as:
+EXPLOIT_REPORT:
+<vuln_id>: <one-line exploit vector>
+<vuln_id>: <one-line exploit vector>
+...
+
+Begin. List the directory first."""
+
+            exploit_report = ""
+            for turn in range(len(remaining) + 2):
+                yield (red_terminal + f"\n  [{ts()}] ▶ thinking...\n", blue_terminal, f"Round {round_num} — Red Agent reconning...")
+                response = model_server.generate.remote(red_prompt, openai_api_key)
+
+                if "EXPLOIT_REPORT:" in response:
+                    exploit_report = response.split("EXPLOIT_REPORT:")[1].strip()
+                    break
+
+                think, instruction = "", ""
+                if "THINK:" in response:
+                    think = response.split("THINK:")[1].split("\n")[0].strip()
+                if "EXEC: vyber" in response:
+                    instruction = response.split("EXEC: vyber")[1].split("\n")[0].strip()
+
+                if instruction:
+                    red_terminal += f"  [{ts()}] THINK  {think}\n"
+                    red_terminal += f"  [{ts()}] EXEC   vyber {instruction}\n"
+                    out = vyber_run(instruction, base_dir)
+                    red_terminal += fmt_tool(f"vyber {instruction}", out)
+                    yield (red_terminal, blue_terminal, f"Round {round_num} — Red Agent executing...")
+                    red_prompt += f"\nTHINK: {think}\nEXEC: vyber {instruction}\nSTDOUT:\n{out}\nNext:"
+                    time.sleep(0.8)
+                else:
+                    exploit_report = response
+                    break
+
+            red_terminal += fmt_section(f"ROUND {round_num}  EXPLOIT REPORT COMMITTED")
+            for line in exploit_report.strip().splitlines():
+                red_terminal += f"  {line}\n"
+            yield (red_terminal, blue_terminal, f"Round {round_num} — Exploit report committed")
+            time.sleep(1.0)
+
+            # ── BLUE AGENT: patch each remaining vuln ─────────────────
+            blue_terminal += fmt_section(f"ROUND {round_num}  BLUE AGENT  PATCHING {len(remaining)} VULNS")
+            blue_terminal += f"  [{ts()}] exploit intel received from red agent\n"
+            blue_terminal += f"  [{ts()}] initiating self-healing patch sequence\n"
+            yield (red_terminal, blue_terminal, f"Round {round_num} — Blue Agent patching...")
+            time.sleep(0.5)
+
+            blue_prompt = f"""You are an autonomous Blue Team self-healing agent. Operate inside /tmp/sandbox/. Be concise and technical. No prose.
+
+THREAT INTEL (red team exploit report):
+{exploit_report}
+
+UNPATCHED VULNERABILITIES ({len(remaining)}):
+{vuln_list_txt}
+
+TOOLS:
+  ACTION: edit <filepath>    — rewrite a file (provide CONTENT: block)
+  ACTION: vyber <command>    — run shell command (chmod, etc.)
+
+OUTPUT FORMAT (one action per response):
+THINK: <one-line technical reasoning>
+ACTION: edit /tmp/sandbox/<filename>
+CONTENT:
+<full new secure file content>
+
+OR:
+THINK: <one-line reasoning>
+ACTION: vyber <command>
+
+Patch ALL vulnerabilities. When every vuln is fixed output: PATCH_COMPLETE"""
+
+            for turn in range(len(remaining) * 2 + 1):
+                yield (red_terminal, blue_terminal + f"\n  [{ts()}] ▶ thinking...\n", f"Round {round_num} — Blue Agent patching...")
+                response = model_server.generate.remote(blue_prompt, openai_api_key)
+
+                if "PATCH_COMPLETE" in response:
+                    blue_terminal += f"  [{ts()}] PATCH_COMPLETE received\n"
+                    break
+
+                think = response.split("THINK:")[1].split("\n")[0].strip() if "THINK:" in response else ""
+
+                if "ACTION: edit" in response:
+                    try:
+                        fp_raw = response.split("ACTION: edit")[1].split("\n")[0].strip()
+                        filepath = fp_raw if fp_raw.startswith("/") else os.path.join(base_dir, os.path.basename(fp_raw))
+                        content = response.split("CONTENT:")[1].strip() if "CONTENT:" in response else ""
+                        if "PATCH_COMPLETE" in content:
+                            content = content.split("PATCH_COMPLETE")[0].strip()
+                    except Exception:
+                        filepath = os.path.join(base_dir, remaining[0]["file"])
+                        content = ""
+
+                    blue_terminal += f"  [{ts()}] THINK  {think}\n"
+                    blue_terminal += f"  [{ts()}] ACTION edit {os.path.basename(filepath)}\n"
+                    if content:
+                        with open(filepath, "w") as f:
+                            f.write(content)
+                    blue_terminal += fmt_tool(f"write {os.path.basename(filepath)}", content[:300] + ("..." if len(content) > 300 else ""))
+                    yield (red_terminal, blue_terminal, f"Round {round_num} — patch applied to {os.path.basename(filepath)}")
+                    blue_prompt += f"\nTHINK: {think}\nACTION: edit {filepath}\nResult: written.\nNext:"
+                    time.sleep(0.8)
+
+                elif "ACTION: vyber" in response:
+                    try:
+                        cmd = response.split("ACTION: vyber")[1].split("\n")[0].strip()
+                    except Exception:
+                        cmd = "chmod 600 app_config.json"
+                    blue_terminal += f"  [{ts()}] THINK  {think}\n"
+                    blue_terminal += f"  [{ts()}] ACTION vyber {cmd}\n"
+                    out = vyber_run(cmd, base_dir)
+                    blue_terminal += fmt_tool(cmd, out)
+                    yield (red_terminal, blue_terminal, f"Round {round_num} — hardening: {cmd}")
+                    blue_prompt += f"\nTHINK: {think}\nACTION: vyber {cmd}\nSTDOUT:\n{out}\nNext:"
+                    time.sleep(0.8)
+                else:
+                    break
+
+            # ── POST-ROUND SCOREBOARD ─────────────────────────────────
+            current_vulns = CyberRangeScenarios.list_vulnerabilities(scenario_id, base_dir)
+            fixed_now = [v for v in current_vulns if v["fixed"]]
+            still_open = [v for v in current_vulns if not v["fixed"]]
+
+            red_terminal += fmt_section(f"ROUND {round_num}  SCOREBOARD")
+            blue_terminal += fmt_section(f"ROUND {round_num}  SCOREBOARD")
+            for v in current_vulns:
+                status = "✓ FIXED " if v["fixed"] else "✗ OPEN  "
+                red_terminal  += f"  [{status}]  {v['id']}  {v['file']}\n"
+                blue_terminal += f"  [{status}]  {v['id']}  {v['file']}\n"
+
+            red_terminal  += f"\n  [{ts()}] remaining : {len(still_open)}/{len(current_vulns)}\n"
+            blue_terminal += f"\n  [{ts()}] remaining : {len(still_open)}/{len(current_vulns)}\n"
+            yield (red_terminal, blue_terminal, f"Round {round_num} complete — {len(still_open)} vulns remaining")
+            time.sleep(1.0)
+
+    # ── FINAL VERDICT ────────────────────────────────────────────────
+    final_vulns = CyberRangeScenarios.list_vulnerabilities(scenario_id, base_dir)
+    all_fixed = all(v["fixed"] for v in final_vulns)
+
+    red_terminal  += fmt_section("FINAL VERDICT")
+    blue_terminal += fmt_section("FINAL VERDICT")
+
+    for v in final_vulns:
+        status = "✓ PATCHED" if v["fixed"] else "✗ EXPOSED"
+        red_terminal  += f"  [{status}]  {v['id']}  {v['cwe']}  {v['file']}\n"
+        blue_terminal += f"  [{status}]  {v['id']}  {v['cwe']}  {v['file']}\n"
+
+    if all_fixed:
+        red_terminal  += f"\n  [{ts()}] verdict : ✗ ALL EXPLOITS BLOCKED\n"
+        red_terminal  += f"  [{ts()}] result  : SYSTEM SECURE\n"
+        blue_terminal += f"\n  [{ts()}] verdict : ✓ ALL {len(final_vulns)} VULNERABILITIES PATCHED\n"
+        blue_terminal += f"  [{ts()}] result  : SYSTEM SECURE\n"
+        yield (red_terminal, blue_terminal, f"✓ Secure — all {len(final_vulns)} vulnerabilities patched")
     else:
-        red_terminal += "Tool Call : Vyber CLI - Read pipeline_config.json\n"
-        out = vyber_run("Read pipeline_config.json", base_dir)
-        
-    red_terminal += f"Output    :\n{out}\n"
-    if is_secure:
-        red_terminal += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        red_terminal += "Result    : EXPLOIT BLOCKED (Access Denied / Secrets Parameterized)\n"
-        red_terminal += "Status    : Secure. System verified."
-        blue_terminal += f"\nSYSTEM: {status_msg}\n"
-        yield (red_terminal, blue_terminal, "Secure: Vulnerability successfully mitigated and verified.")
-    else:
-        red_terminal += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        red_terminal += f"Result    : EXPLOIT SUCCESS (Vulnerability Still Open)\n"
-        red_terminal += f"Status    : Compromised. Reason: {status_msg}"
-        blue_terminal += f"\nSYSTEM: Mitigation validation failed: {status_msg}\n"
-        yield (red_terminal, blue_terminal, "Failed: Mitigation validation failed.")
+        open_count = sum(1 for v in final_vulns if not v["fixed"])
+        red_terminal  += f"\n  [{ts()}] verdict : ✓ {open_count} EXPLOITS STILL ACTIVE\n"
+        red_terminal  += f"  [{ts()}] result  : SYSTEM COMPROMISED\n"
+        blue_terminal += f"\n  [{ts()}] verdict : ✗ {open_count} VULNERABILITIES UNPATCHED\n"
+        blue_terminal += f"  [{ts()}] result  : SYSTEM AT RISK\n"
+        yield (red_terminal, blue_terminal, f"✗ {open_count}/{len(final_vulns)} vulnerabilities remain unpatched")
+
