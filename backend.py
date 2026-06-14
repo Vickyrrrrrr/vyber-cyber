@@ -200,23 +200,30 @@ class ModelServer:
             from llama_cpp import Llama
             from huggingface_hub import hf_hub_download
             
-            repo_id = "vxkyyy/vyber-security-1.5b-gguf"
-            filename = "vyber-security-1.5b.gguf"
+            # Tiered model search to automatically load the best available model
+            model_options = [
+                ("vxkyyy/vyber-security-7b-gguf", "vyber-security-7b.gguf"),
+                ("vxkyyy/vyber-security-1.5b-gguf", "vyber-security-1.5b.gguf"),
+                ("Qwen/Qwen2.5-7B-Instruct-GGUF", "qwen2.5-7b-instruct-q4_k_m.gguf"),
+                ("Qwen/Qwen2.5-1.5B-Instruct-GGUF", "qwen2.5-1.5b-instruct-q8_0.gguf")
+            ]
             
-            print(f"Downloading model {filename} from {repo_id}...")
-            try:
-                model_path = hf_hub_download(
-                    repo_id=repo_id, 
-                    filename=filename,
-                    cache_dir="/cache"
-                )
-            except Exception as hf_err:
-                print(f"Failed to download fine-tuned model: {hf_err}. Falling back to public Qwen2.5-1.5B...")
-                model_path = hf_hub_download(
-                    repo_id="Qwen/Qwen2.5-1.5B-Instruct-GGUF",
-                    filename="qwen2.5-1.5b-instruct-q8_0.gguf",
-                    cache_dir="/cache"
-                )
+            model_path = None
+            for repo_id, filename in model_options:
+                try:
+                    print(f"Attempting to download and load {filename} from {repo_id}...")
+                    model_path = hf_hub_download(
+                        repo_id=repo_id,
+                        filename=filename,
+                        cache_dir="/cache"
+                    )
+                    print(f"Successfully retrieved model at {model_path}!")
+                    break
+                except Exception as err:
+                    print(f"Skipping {repo_id}/{filename}: {err}")
+                    
+            if not model_path:
+                raise RuntimeError("Failed to download any fine-tuned or public model fallback.")
             
             print(f"Loading GGUF model from {model_path} via llama.cpp...")
             self.llm = Llama(

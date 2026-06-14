@@ -30,25 +30,43 @@ image = (
     image=image,
     gpu="A10G",
     volumes={"/cache": cache_volume},
-    timeout=1800
+    timeout=3600  # 1 hour timeout suitable for 7B dataset training
 )
-def train_and_convert_gguf(hf_token: str, repo_id: str):
+def train_and_convert_gguf(hf_token: str, repo_id: str, model_size: str):
     import torch
     from datasets import load_dataset
-    from transformers import AutoModelForCausalLM, AutoTokenizer, TrainingArguments
+    from transformers import AutoModelForCausalLM, AutoTokenizer
     from peft import LoraConfig, get_peft_model
-    from trl import SFTTrainer
+    from trl import SFTTrainer, SFTConfig
     import subprocess
     from huggingface_hub import HfApi
 
+    # Define model configurations based on requested size (1.5B or 7B)
+    if model_size == "7b":
+        model_id = "Qwen/Qwen2.5-7B-Instruct"
+        split_size = "train[:5000]"  # 10x larger dataset subset for higher accuracy
+        max_steps = 300              # 300 steps is optimized for cost-effective A10G run
+        lora_r = 16
+        lora_alpha = 32
+        target_modules = ["q_proj", "v_proj", "k_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+        use_grad_checkpointing = True
+    else:
+        model_id = "Qwen/Qwen2.5-1.5B-Instruct"
+        split_size = "train[:500]"
+        max_steps = 50
+        lora_r = 8
+        lora_alpha = 16
+        target_modules = ["q_proj", "v_proj", "k_proj", "o_proj"]
+        use_grad_checkpointing = False
+
     print("Starting fine-tuning pipeline on serverless GPU...")
-    print(f"Base model: Qwen/Qwen2.5-1.5B-Instruct")
+    print(f"Base model: {model_id}")
     print(f"Target repository: {repo_id}")
+    print(f"Dataset split: {split_size}")
 
     # 1. Load cybersecurity instruction dataset
     print("Loading cybersecurity instruction dataset...")
-    # Load first 500 samples to keep training fast and focused
-    dataset = load_dataset("Trendyol/Trendyol-Cybersecurity-Instruction-Tuning-Dataset", split="train[:500]")
+    dataset = load_dataset("Trendyol/Trendyol-Cybersecurity-Instruction-Tuning-Dataset", split=split_size)
 
     # Format dataset for Qwen Chat
     def format_prompts(batch):
@@ -59,9 +77,8 @@ def train_and_convert_gguf(hf_token: str, repo_id: str):
 
     dataset = dataset.map(format_prompts, batched=True)
 
-    # 2. Initialize Base Model and Tokenizer (in FP16 to fit easily in A10G VRAM)
+    # 2. Initialize Base Model and Tokenizer (in FP16 to fit in A10G VRAM)
     print("Loading model and tokenizer...")
-    model_id = "Qwen/Qwen2.5-1.5B-Instruct"
     model = AutoModelForCausalLM.from_pretrained(
         model_id,
         torch_dtype=torch.float16,
@@ -74,28 +91,28 @@ def train_and_convert_gguf(hf_token: str, repo_id: str):
     # 3. Setup LoRA
     print("Configuring LoRA parameters...")
     peft_config = LoraConfig(
-        r=8,
-        lora_alpha=16,
-        target_modules=["q_proj", "v_proj", "k_proj", "o_proj"],
+        r=lora_r,
+        lora_alpha=lora_alpha,
+        target_modules=target_modules,
         lora_dropout=0.05,
         bias="none",
         task_type="CAUSAL_LM"
     )
 
-    # 4. Training Arguments (Using SFTConfig to support modern TRL versions)
-    from trl import SFTConfig
+    # 4. Training Arguments
     training_args = SFTConfig(
         output_dir="/tmp/results",
-        per_device_train_batch_size=2,
+        per_device_train_batch_size=1 if model_size == "7b" else 2,  # Batch size 1 prevents out of memory on 7B
         gradient_accumulation_steps=4,
         learning_rate=2e-4,
         logging_steps=5,
-        max_steps=50, # Fast training suitable for a demo/badge verification
+        max_steps=max_steps,
         fp16=True,
         optim="adamw_torch",
         report_to="none",
         dataset_text_field="text",
-        max_length=512
+        max_length=1024,
+        gradient_checkpointing=use_grad_checkpointing
     )
 
     # 5. Initialize SFTTrainer
@@ -138,7 +155,8 @@ def train_and_convert_gguf(hf_token: str, repo_id: str):
 
     # 8. Convert to GGUF format
     print("Converting merged model to GGUF format using llama.cpp...")
-    gguf_output_path = "/tmp/vyber-security-1.5b.gguf"
+    gguf_output_filename = f"vyber-security-{model_size}.gguf"
+    gguf_output_path = f"/tmp/{gguf_output_filename}"
     
     # Run convert_hf_to_gguf.py
     res = subprocess.run([
@@ -160,7 +178,7 @@ def train_and_convert_gguf(hf_token: str, repo_id: str):
     api.create_repo(repo_id=repo_id, repo_type="model", exist_ok=True, token=hf_token)
     api.upload_file(
         path_or_fileobj=gguf_output_path,
-        path_in_repo="vyber-security-1.5b.gguf",
+        path_in_repo=gguf_output_filename,
         repo_id=repo_id,
         token=hf_token
     )
@@ -168,7 +186,12 @@ def train_and_convert_gguf(hf_token: str, repo_id: str):
     return f"Success! Model published at https://huggingface.co/{repo_id}"
 
 @app.local_entrypoint()
-def main(repo_name: str = "vyber-security-1.5b-gguf"):
+def main(model_size: str = "7b", repo_name: str = None):
+    # Verify model size input
+    if model_size not in ["1.5b", "7b"]:
+        print("Error: model_size must be either '1.5b' or '7b'")
+        sys.exit(1)
+
     hf_token = os.environ.get("HF_TOKEN")
     if not hf_token:
         print("Error: HF_TOKEN environment variable is required to publish the model.")
@@ -178,10 +201,8 @@ def main(repo_name: str = "vyber-security-1.5b-gguf"):
     username = os.environ.get("HF_USERNAME")
     if not username:
         # Resolve username from token
-        from huggingface_hub import WhoAmI
-        from huggingface_hub.utils import HfHubHTTPError
+        from huggingface_hub import HfApi
         try:
-            from huggingface_hub import HfApi
             api = HfApi()
             user_info = api.whoami(token=hf_token)
             username = user_info["name"]
@@ -190,9 +211,13 @@ def main(repo_name: str = "vyber-security-1.5b-gguf"):
             print("Please run: export HF_USERNAME=your_username")
             sys.exit(1)
             
+    if not repo_name:
+        repo_name = f"vyber-security-{model_size}-gguf"
+
     repo_id = f"{username}/{repo_name}"
     print(f"Resolved Repository: {repo_id}")
+    print(f"Selected Model Size: {model_size}")
     
     # Trigger Modal training function
-    result = train_and_convert_gguf.remote(hf_token, repo_id)
+    result = train_and_convert_gguf.remote(hf_token, repo_id, model_size)
     print(result)
