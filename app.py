@@ -307,10 +307,46 @@ button.primary:disabled {
     padding: 12px 24px !important;
 }
 
+.live-button *,
+.live-button button *,
+.live-button span {
+    color: #802f1a !important;
+    -webkit-text-fill-color: #802f1a !important;
+}
+
 .live-button:hover,
 .live-button:hover button {
     background-color: #f7f2eb !important;
     border-color: #802f1a !important;
+}
+
+.live-button:focus,
+.live-button button:focus {
+    outline: 2px solid #c99584 !important;
+    outline-offset: 2px !important;
+}
+
+.live-button:disabled,
+.live-button button:disabled,
+.live-button[aria-disabled="true"],
+.live-button button[aria-disabled="true"],
+.live-button.disabled,
+.live-button .disabled {
+    background-color: #f2ece4 !important;
+    color: #594c43 !important;
+    -webkit-text-fill-color: #594c43 !important;
+    border-color: #d7cab9 !important;
+    opacity: 1 !important;
+}
+
+.live-button:disabled *,
+.live-button button:disabled *,
+.live-button[aria-disabled="true"] *,
+.live-button button[aria-disabled="true"] *,
+.live-button.disabled *,
+.live-button .disabled * {
+    color: #594c43 !important;
+    -webkit-text-fill-color: #594c43 !important;
 }
 
 .action-row {
