@@ -180,7 +180,8 @@ image = (
     modal.Image.from_registry("nvidia/cuda:12.1.1-devel-ubuntu22.04", add_python="3.11")
     .apt_install("nmap", "curl", "git", "build-essential", "cmake", "clang")
     .run_commands(
-        "CMAKE_ARGS='-DGGML_CUDA=on' pip install llama-cpp-python",
+        "ln -sf /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1",
+        "LD_LIBRARY_PATH=/usr/local/cuda/lib64/stubs:$LD_LIBRARY_PATH CMAKE_ARGS='-DGGML_CUDA=on' pip install llama-cpp-python",
         "curl -fsSL https://opencode.ai/install | bash",
         "ln -s /usr/local/bin/opencode /usr/local/bin/vyber"
     )

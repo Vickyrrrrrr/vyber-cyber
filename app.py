@@ -5,43 +5,39 @@ import modal
 
 # Premium minimalist grey-and-white developer stylesheet
 css = """
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:ital,wght@0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap');
 
 body {
-    background-color: #09090b !important;
-    color: #fafafa !important;
+    background-color: #faf8f5 !important;
+    color: #231f1d !important;
     font-family: 'Inter', -apple-system, sans-serif !important;
     -webkit-font-smoothing: antialiased;
 }
 
 .gradio-container {
-    background-color: #09090b !important;
-    border: 1px solid #27272a !important;
-    border-radius: 8px !important;
-    max-width: 1200px !important;
-    margin: 40px auto !important;
-    padding: 32px !important;
-    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4) !important;
+    background-color: #faf8f5 !important;
+    border: none !important;
+    max-width: 95% !important;
+    width: 95% !important;
+    margin: 20px auto !important;
+    padding: 24px !important;
+    box-shadow: none !important;
 }
 
-h1 {
-    font-family: 'Inter', sans-serif !important;
-    font-weight: 700 !important;
-    color: #ffffff !important;
-    letter-spacing: -0.025em !important;
+/* Dropdown and Controls */
+.gr-dropdown, .gr-input, .gr-box {
+    background-color: #ffffff !important;
+    border: 1px solid #e6dfd5 !important;
+    border-radius: 4px !important;
+    color: #231f1d !important;
 }
 
-p {
-    color: #a1a1aa !important;
-    font-family: 'Inter', sans-serif !important;
-}
-
-/* Terminals Styling */
+/* Terminals Styling - Classy dark terminal box on cream page */
 .red-terminal textarea, .blue-terminal textarea {
-    background-color: #121214 !important;
-    border: 1px solid #27272a !important;
-    border-radius: 6px !important;
-    color: #fafafa !important;
+    background-color: #181615 !important;
+    border: 1px solid #e6dfd5 !important;
+    border-radius: 4px !important;
+    color: #faf8f5 !important;
     font-family: 'JetBrains Mono', monospace !important;
     font-size: 0.875rem !important;
     line-height: 1.6 !important;
@@ -50,46 +46,46 @@ p {
 }
 
 .red-terminal textarea:focus, .blue-terminal textarea:focus {
-    border-color: #3f3f46 !important;
+    border-color: #802f1a !important;
     box-shadow: none !important;
 }
 
-/* Custom Dropdown Styling */
-.gr-dropdown {
-    background-color: #18181b !important;
-    border: 1px solid #27272a !important;
-    border-radius: 6px !important;
-    color: #ffffff !important;
-}
-
-/* Premium Minimalist Button (White on black) */
+/* Premium Minimalist Button - Rust background */
 .launch-button {
-    background-color: #ffffff !important;
-    color: #09090b !important;
-    border: 1px solid #ffffff !important;
-    border-radius: 6px !important;
+    background-color: #802f1a !important;
+    color: #ffffff !important;
+    border: 1px solid #802f1a !important;
+    border-radius: 4px !important;
     font-weight: 500 !important;
     font-family: 'Inter', sans-serif !important;
-    padding: 10px 20px !important;
+    padding: 12px 24px !important;
     transition: all 0.15s ease-in-out !important;
     cursor: pointer !important;
 }
 
 .launch-button:hover {
-    background-color: #e4e4e7 !important;
-    border-color: #e4e4e7 !important;
+    background-color: #692412 !important;
+    border-color: #692412 !important;
 }
 
-/* Status Banner */
+/* Status Banner - Warm gray/beige banner */
 #status-banner {
-    background-color: #121214 !important;
-    border: 1px solid #27272a !important;
-    border-radius: 6px !important;
+    background-color: #f2ece4 !important;
+    border: 1px solid #e6dfd5 !important;
+    border-radius: 4px !important;
     padding: 14px 20px !important;
     font-family: 'Inter', sans-serif !important;
     font-size: 0.95rem !important;
     font-weight: 500 !important;
-    color: #a1a1aa !important;
+    color: #594c43 !important;
+}
+
+/* Labels and Markdown titles */
+h3 {
+    font-family: 'Playfair Display', serif !important;
+    color: #231f1d !important;
+    font-weight: 700 !important;
+    margin-top: 10px !important;
 }
 """
 
@@ -129,13 +125,20 @@ def launch_duel(scenario_name):
 # Build Gradio UI
 with gr.Blocks(theme=gr.themes.Default(primary_hue="zinc", secondary_hue="zinc"), css=css) as demo:
     gr.HTML(
-        "<div style='text-align: center; margin-bottom: 28px;'>"
-        "<h1 style='color: #ffffff; font-family: \"Inter\", sans-serif; font-size: 2.25rem; margin-bottom: 8px; font-weight: 700; letter-spacing: -0.03em;'>"
-        "Cyber-Range Simulation Dashboard"
+        "<div style='text-align: center; margin-bottom: 40px;'>"
+        "<p style='color: #802f1a; font-family: \"Inter\", sans-serif; font-size: 0.85rem; font-weight: 600; letter-spacing: 0.15em; margin-bottom: 12px; text-transform: uppercase;'>"
+        "Autonomous Self-Healing Cyber-Range"
+        "</p>"
+        "<h1 style='color: #231f1d; font-family: \"Playfair Display\", \"Georgia\", serif; font-size: 3rem; margin-bottom: 12px; font-weight: 700; letter-spacing: -0.01em;'>"
+        "Vyber Duel"
         "</h1>"
-        "<p style='color: #a1a1aa; font-size: 1.05rem; max-width: 800px; margin: 0 auto; line-height: 1.5; font-weight: 400;'>"
-        "Autonomous Red Team penetration testing vs. self-healing Blue Team defense agents in serverless container sandboxes.<br/>"
-        "<span style='color: #d1d5db; font-size: 0.875rem; font-weight: 500; opacity: 0.85;'>Note: The first launch will take 3-4 minutes to allocate hardware and load model weights on the serverless GPU backend.</span>"
+        "<p style='color: #802f1a; font-family: \"Playfair Display\", \"Georgia\", serif; font-size: 1.35rem; font-style: italic; margin-bottom: 20px; font-weight: 400;'>"
+        "will the defense agent patch the vulnerability before the attack succeeds?"
+        "</p>"
+        "<p style='color: #594c43; font-family: \"Inter\", sans-serif; font-size: 1rem; max-width: 800px; margin: 0 auto; line-height: 1.6; font-weight: 400;'>"
+        "A serverless cyber-range where a custom fine-tuned 1.5B model acts as both offensive attacker and defensive responder. "
+        "Running on the <strong>llama.cpp</strong> runtime with local CUDA acceleration.<br/>"
+        "<span style='color: #802f1a; font-size: 0.85rem; font-weight: 500;'>Note: Initial execution requires 3-4 minutes to compile CUDA wheels, spin up hardware, and load GGUF weights.</span>"
         "</p>"
         "</div>"
     )
