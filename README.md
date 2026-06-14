@@ -234,17 +234,13 @@ Vyber naturally demonstrates several sponsor technologies:
 
 This makes the project a strong fit for agentic app judging, Modal-powered app judging, custom Gradio UI judging, and fine-tuned model judging.
 
-## Submission Checklist
+## Submission Assets
 
-Before final submission:
-
-- Space link: `https://huggingface.co/spaces/build-small-hackathon/vyber-cyber`
-- GitHub repo link: `https://github.com/Vickyrrrrrr/vyber-cyber`
-- Model link: `https://huggingface.co/vxkyyy/vyber-security-7b-gguf`
-- short demo video showing demo replay and one live GPU duel
-- social post explaining the Red -> Blue -> Red verification loop
-- optional field-notes post covering model training, Modal deployment, `llama.cpp`, and the safety boundary
-- optional sanitized trace artifact for the Sharing is Caring bonus
+| Asset | Link |
+| --- | --- |
+| Hugging Face Space | [`build-small-hackathon/vyber-cyber`](https://huggingface.co/spaces/build-small-hackathon/vyber-cyber) |
+| Model | [`vxkyyy/vyber-security-7b-gguf`](https://huggingface.co/vxkyyy/vyber-security-7b-gguf) |
+| Source code | [`Vickyrrrrrr/vyber-cyber`](https://github.com/Vickyrrrrrr/vyber-cyber) |
 
 ## Future Upgrades
 
