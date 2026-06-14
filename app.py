@@ -142,37 +142,61 @@ html, body {
 .dark .operation-terminal textarea:focus,
 .dark .operation-terminal textarea:disabled,
 .dark .operation-terminal textarea[readonly] {
-    background-color: #0d0f10 !important;
-    background: #0d0f10 !important;
-    border: 1px solid #28231f !important;
+    background-color: #111312 !important;
+    background: #111312 !important;
+    border: 1px solid #25221f !important;
     border-left: 3px solid #802f1a !important;
     border-radius: 4px !important;
-    color: #eee7dc !important;
-    -webkit-text-fill-color: #eee7dc !important;
+    color: #d8d0c4 !important;
+    -webkit-text-fill-color: #d8d0c4 !important;
     opacity: 1 !important;
     font-family: 'JetBrains Mono', 'Fira Code', monospace !important;
-    font-size: 0.86rem !important;
-    line-height: 1.62 !important;
-    padding: 22px 24px !important;
+    font-size: 0.84rem !important;
+    font-weight: 400 !important;
+    line-height: 1.58 !important;
+    padding: 24px 28px !important;
     resize: none !important;
     text-shadow: none !important;
     box-shadow: none !important;
-    caret-color: #eee7dc !important;
+    caret-color: transparent !important;
+    outline: none !important;
+    animation: none !important;
+    transition: none !important;
+    filter: none !important;
+}
+.operation-terminal,
+.operation-terminal *,
+.operation-terminal.generating,
+.operation-terminal.generating *,
+.operation-terminal.pending,
+.operation-terminal.pending *,
+.operation-terminal .generating,
+.operation-terminal .pending,
+.operation-terminal [class*="generating"],
+.operation-terminal [class*="pending"] {
+    animation: none !important;
+    transition: none !important;
+    opacity: 1 !important;
+    filter: none !important;
 }
 .operation-terminal .wrap,
 .dark .operation-terminal .wrap {
-    background-color: #0d0f10 !important;
-    border-color: #28231f !important;
+    background-color: #111312 !important;
+    border-color: #25221f !important;
+    border-radius: 4px !important;
+    box-shadow: none !important;
 }
 .operation-terminal label, .operation-terminal .block-label,
 .dark .operation-terminal label, .dark .operation-terminal .block-label {
-    color: #8c7667 !important;
-    -webkit-text-fill-color: #8c7667 !important;
+    color: #7e695c !important;
+    -webkit-text-fill-color: #7e695c !important;
     background: transparent !important;
+    font-size: 0.72rem !important;
+    letter-spacing: 0.04em !important;
 }
 .operation-terminal textarea::-webkit-scrollbar { width: 6px; }
-.operation-terminal textarea::-webkit-scrollbar-track { background: #0d0f10; }
-.operation-terminal textarea::-webkit-scrollbar-thumb { background: #4d3328; border-radius: 3px; }
+.operation-terminal textarea::-webkit-scrollbar-track { background: #111312; }
+.operation-terminal textarea::-webkit-scrollbar-thumb { background: #3b3029; border-radius: 3px; }
 
 /* ── BLUE TEAM TERMINAL — cool dark navy tint ── */
 .blue-terminal textarea,
@@ -422,8 +446,9 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="zinc", secondary_hue="zinc")
     gr.Markdown("### Operation Terminal")
     operation_terminal = gr.Textbox(
         label="Autonomous Red-to-Blue Security Trace",
-        lines=34,
-        max_lines=42,
+        lines=26,
+        max_lines=34,
+        interactive=False,
         autoscroll=True,
         elem_classes=["operation-terminal"]
     )
