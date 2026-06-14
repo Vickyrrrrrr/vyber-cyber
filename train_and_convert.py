@@ -104,7 +104,7 @@ def train_and_convert_gguf(hf_token: str, repo_id: str):
         model=model,
         train_dataset=dataset,
         peft_config=peft_config,
-        tokenizer=tokenizer,
+        processing_class=tokenizer,
         args=training_args
     )
 
