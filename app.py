@@ -2,6 +2,7 @@ import os
 import time
 import html
 import re
+import threading
 import gradio as gr
 import modal
 
@@ -293,6 +294,25 @@ button.primary:disabled {
     -webkit-text-fill-color: #fff8f3 !important;
 }
 
+.live-button,
+.live-button button,
+.live-button span {
+    background-color: #ffffff !important;
+    color: #802f1a !important;
+    -webkit-text-fill-color: #802f1a !important;
+    border: 1px solid #c99584 !important;
+    border-radius: 4px !important;
+    font-weight: 500 !important;
+    font-family: 'Inter', sans-serif !important;
+    padding: 12px 24px !important;
+}
+
+.live-button:hover,
+.live-button:hover button {
+    background-color: #f7f2eb !important;
+    border-color: #802f1a !important;
+}
+
 .hero {
     text-align: center !important;
     max-width: 860px !important;
@@ -416,6 +436,95 @@ SCENARIO_MAP = {
     "Lab Pack 6: WebGoat-style Deserialization & Upload Risk": 6
 }
 
+LIVE_GPU_LOCK = threading.Lock()
+
+DEMO_SCENARIOS = {
+    1: {
+        "files": ["app_config.json", "server.env", "deploy.sh"],
+        "cwes": ["CWE-312", "CWE-312", "CWE-732"],
+        "issues": [
+            "Hardcoded API key and database password",
+            "Cloud and payment credentials committed to env file",
+            "World-readable deploy script with embedded DB password",
+        ],
+        "fixes": [
+            "Moved secrets to environment references and disabled debug",
+            "Removed live keys and replaced them with secret-manager placeholders",
+            "Removed embedded password and hardened deploy.sh to owner-only execution",
+        ],
+    },
+    2: {
+        "files": ["db_settings.yaml", "nginx.conf", "firewall_rules.json"],
+        "cwes": ["CWE-306", "CWE-327", "CWE-284"],
+        "issues": [
+            "Database binds publicly without authentication",
+            "Weak SSL protocols and ciphers enabled",
+            "Inbound firewall allows all TCP/UDP ports from the internet",
+        ],
+        "fixes": [
+            "Bound database to localhost and required authentication",
+            "Restricted TLS to modern protocols and strong ciphers",
+            "Replaced broad inbound rules with least-privilege allowlist",
+        ],
+    },
+    3: {
+        "files": ["pipeline_config.json", "traffic_stream.log", "api_gateway.json"],
+        "cwes": ["CWE-319", "CWE-532", "CWE-306"],
+        "issues": [
+            "Billing stream sends data over HTTP",
+            "Traffic log contains card data and CVV",
+            "Admin API is public with no auth or rate limit",
+        ],
+        "fixes": [
+            "Upgraded endpoint to HTTPS with certificate verification",
+            "Scrubbed card data and CVV from logs",
+            "Enabled auth, rate limiting, and private admin routes",
+        ],
+    },
+    4: {
+        "files": ["login_handler.py", "session_config.json", "access_audit.log"],
+        "cwes": ["CWE-89", "CWE-352", "CWE-532"],
+        "issues": [
+            "Login flow builds SQL with string interpolation",
+            "Session cookies are weak and CSRF is disabled",
+            "Access logs expose password payloads and reset tokens",
+        ],
+        "fixes": [
+            "Rewrote login query with parameterized inputs",
+            "Rotated session secret and enabled secure cookies plus CSRF",
+            "Removed credential payloads and reset tokens from audit logs",
+        ],
+    },
+    5: {
+        "files": ["auth_routes.js", "api_policy.json", "payment_debug.log"],
+        "cwes": ["CWE-347", "CWE-942", "CWE-532"],
+        "issues": [
+            "JWT admin check trusts decoded unsigned tokens",
+            "API policy allows wildcard CORS and public admin access",
+            "Payment debug log leaks card data and JWT-like tokens",
+        ],
+        "fixes": [
+            "Switched to verified JWTs with env-backed signing secret",
+            "Scoped CORS, required auth, added rate limit, and privatized admin routes",
+            "Scrubbed card data, CVV, and token values from debug logs",
+        ],
+    },
+    6: {
+        "files": ["profile_importer.py", "upload_policy.yaml", "worker_permissions.json"],
+        "cwes": ["CWE-502", "CWE-434", "CWE-250"],
+        "issues": [
+            "Profile importer deserializes untrusted pickle data",
+            "Upload policy accepts wildcard executable content",
+            "Worker runs as root with shell and unrestricted egress",
+        ],
+        "fixes": [
+            "Replaced pickle with JSON parsing and schema validation",
+            "Restricted upload types, enabled scanning, and moved storage outside webroot",
+            "Dropped root privileges, disabled shell spawning, and restricted egress",
+        ],
+    },
+}
+
 def clean_console(text):
     text = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", text)
     replacements = {
@@ -441,7 +550,7 @@ def clean_console(text):
         text = text.replace(old, new)
     return text
 
-def format_operation_trace(red_out, blue_out):
+def format_operation_trace(red_out, blue_out, backend_label="Hugging Face Space UI -> Modal GPU worker"):
     red = clean_console(red_out or "").strip()
     blue = clean_console(blue_out or "").strip()
 
@@ -449,7 +558,7 @@ def format_operation_trace(red_out, blue_out):
         "VYBER OPERATION TRACE",
         "mode        : autonomous cyber-range",
         "model       : vxkyyy/vyber-security-7b-gguf",
-        "backend     : Hugging Face Space UI -> Modal GPU worker",
+        f"backend     : {backend_label}",
         "workspace   : /tmp/sandbox",
         "",
         "PHASE 01 / RED TEAM DISCOVERY",
@@ -488,32 +597,110 @@ def format_operation_trace(red_out, blue_out):
         "</pre></div>"
     )
 
+def run_demo_replay(scenario_name):
+    scenario_id = SCENARIO_MAP.get(scenario_name, 1)
+    demo = DEMO_SCENARIOS[scenario_id]
+    ids = [f"S{scenario_id}-V{i}" for i in range(1, 4)]
+
+    red = (
+        "vyber-range v1.0  //  red-team agent shell\n"
+        "----------------------------------------------\n"
+        f"  [demo] scenario   : {scenario_id}\n"
+        "  [demo] status     : target files deployed\n"
+    )
+    yield format_operation_trace(red, "", "Demo replay (no GPU)"), "Status: Demo replay started - no GPU credits used"
+    time.sleep(0.4)
+
+    red += "\n+--------------------------------------------+\n"
+    red += "|  THREAT SURFACE  3 VULNERABILITIES PLANTED |\n"
+    red += "+--------------------------------------------+\n"
+    for vuln_id, cwe, filename, issue in zip(ids, demo["cwes"], demo["files"], demo["issues"]):
+        red += f"  [OPEN]  {vuln_id}  {cwe}  {filename}\n"
+        red += f"          {issue}\n"
+    yield format_operation_trace(red, "", "Demo replay (no GPU)"), "Status: Demo Red Agent mapped the threat surface"
+    time.sleep(0.5)
+
+    red += "\n+--------------------------------------------+\n"
+    red += "|  ROUND 1  EXPLOIT REPORT COMMITTED         |\n"
+    red += "+--------------------------------------------+\n"
+    for vuln_id, cwe, filename, issue in zip(ids, demo["cwes"], demo["files"], demo["issues"]):
+        red += f"  FINDING {vuln_id}\n"
+        red += f"  FILE: {filename}\n"
+        red += f"  CWE: {cwe}\n"
+        red += "  SEVERITY: High\n"
+        red += f"  EVIDENCE: {issue}\n"
+        red += f"  ATTACK_PATH: Red replays the lab exploit against {filename}.\n"
+        red += f"  IMPACT: {issue}\n"
+    yield format_operation_trace(red, "", "Demo replay (no GPU)"), "Status: Demo Red Agent committed exploit report"
+    time.sleep(0.5)
+
+    blue = (
+        "vyber-range v1.0  //  blue-team SOC shell\n"
+        "----------------------------------------------\n"
+        "  [demo] telemetry  : active\n"
+        "  [demo] watchdog   : monitoring /tmp/sandbox/\n"
+        "  [demo] status     : exploit intel received\n"
+        "\n+--------------------------------------------+\n"
+        "|  ROUND 1  BLUE AGENT  VYBER HARNESS        |\n"
+        "+--------------------------------------------+\n"
+        "  [demo] launching Vyber patch harness\n"
+    )
+    for vuln_id, filename, fix in zip(ids, demo["files"], demo["fixes"]):
+        blue += f"  [PATCHED] {vuln_id}  {filename}\n"
+        blue += f"            {fix}\n"
+    yield format_operation_trace(red, blue, "Demo replay (no GPU)"), "Status: Demo Blue Agent patched all findings"
+    time.sleep(0.5)
+
+    verdict = "\n+--------------------------------------------+\n"
+    verdict += "|  ROUND 1  RED RE-ATTACK VERIFICATION       |\n"
+    verdict += "+--------------------------------------------+\n"
+    for vuln_id, cwe, filename in zip(ids, demo["cwes"], demo["files"]):
+        verdict += f"  [BLOCKED]  {vuln_id}  {cwe}  {filename}\n"
+    verdict += "\n  [demo] verdict : PASS ALL 3 EXPLOITS BLOCKED BY PATCHES\n"
+    verdict += "  [demo] result  : SYSTEM SECURE\n"
+    red += verdict
+    blue += verdict
+    yield format_operation_trace(red, blue, "Demo replay (no GPU)"), "Status: Demo complete - live GPU was not used"
+
 def launch_duel(scenario_name):
     scenario_id = SCENARIO_MAP.get(scenario_name, 1)
-    
-    # Immediately notify the user of real state
-    yield format_operation_trace("", ""), "Status: Connecting to serverless GPU backend (provisioning node and loading weights)..."
-    
-    # Connect securely to active Modal application
-    openai_api_key = os.environ.get("OPENAI_API_KEY", "")
+
+    if not LIVE_GPU_LOCK.acquire(blocking=False):
+        busy = (
+            "vyber-range v1.0  //  live-gpu admission control\n"
+            "----------------------------------------------\n"
+            "  status     : live Modal GPU duel already running\n"
+            "  action     : run the demo replay now, or retry live mode shortly\n"
+        )
+        yield format_operation_trace(busy, "", "Live Modal GPU worker"), "Status: Live GPU busy - demo replay is available"
+        return
+
     try:
-        # Lookup the remote function using modern from_name
-        f = modal.Function.from_name("cyber-defense-range", "run_duel_stream")
-        # Call generator to stream outputs character-by-character
-        for red_out, blue_out, banner_txt in f.remote_gen(scenario_id, openai_api_key=openai_api_key):
-            yield format_operation_trace(red_out, blue_out), f"Status: {clean_console(banner_txt)}"
-    except Exception as e:
-        print(f"Modal Remote Gen lookup failed: {e}. Falling back to local execution.")
-        # Fallback to local import if Modal client is not fully authenticated/connected
+        # Immediately notify the user of real state
+        yield format_operation_trace("", ""), "Status: Connecting to serverless GPU backend (provisioning node and loading weights)..."
+
+        # Connect securely to active Modal application
+        openai_api_key = os.environ.get("OPENAI_API_KEY", "")
         try:
-            # We import here to avoid circular dependencies
-            from backend import run_duel_stream
-            # Execute generator locally (directly calls the function logic)
-            for red_out, blue_out, banner_txt in run_duel_stream.local(scenario_id, openai_api_key=openai_api_key):
+            # Lookup the remote function using modern from_name
+            f = modal.Function.from_name("cyber-defense-range", "run_duel_stream")
+            # Call generator to stream outputs character-by-character
+            for red_out, blue_out, banner_txt in f.remote_gen(scenario_id, openai_api_key=openai_api_key):
                 yield format_operation_trace(red_out, blue_out), f"Status: {clean_console(banner_txt)}"
-        except Exception as local_err:
-            error_msg = f"Red Team Agent connection error:\n{str(e)}\nLocal Fallback error:\n{str(local_err)}"
-            yield format_operation_trace(clean_console(error_msg), ""), "Status: Connection Error"
+        except Exception as e:
+            print(f"Modal Remote Gen lookup failed: {e}. Falling back to local execution.")
+            # Fallback to local import if Modal client is not fully authenticated/connected
+            try:
+                # We import here to avoid circular dependencies
+                from backend import run_duel_stream
+                # Execute generator locally (directly calls the function logic)
+                for red_out, blue_out, banner_txt in run_duel_stream.local(scenario_id, openai_api_key=openai_api_key):
+                    yield format_operation_trace(red_out, blue_out), f"Status: {clean_console(banner_txt)}"
+            except Exception as local_err:
+                error_msg = f"Red Team Agent connection error:\n{str(e)}\nLocal Fallback error:\n{str(local_err)}"
+                yield format_operation_trace(clean_console(error_msg), ""), "Status: Connection Error"
+    finally:
+        LIVE_GPU_LOCK.release()
 
 # Build Gradio UI
 with gr.Blocks(theme=gr.themes.Default(primary_hue="zinc", secondary_hue="zinc"), css=css) as demo:
@@ -539,12 +726,13 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="zinc", secondary_hue="zinc")
             label="Target Cyber-Range Scenario",
             elem_classes=["scenario-selector"]
         )
-        launch_btn = gr.Button("Launch Simulation Duel", variant="primary", elem_id="launch-duel-button", elem_classes=["launch-button"])
+        demo_btn = gr.Button("Run Demo Replay", variant="primary", elem_id="launch-duel-button", elem_classes=["launch-button"])
+        launch_btn = gr.Button("Launch Live GPU Duel", variant="secondary", elem_classes=["live-button"])
 
     gr.HTML(
         "<div class='lab-note'>"
-        "<strong>Curated lab packs:</strong> choose the original Vyber config range or OWASP-inspired vulnerable app patterns. "
-        "Every run is generated inside an isolated sandbox, streamed live, patched by the Blue Agent, and verified by Red re-running the same exploit attempt."
+        "<strong>Public demo mode:</strong> Run Demo Replay is instant and uses no GPU credits. "
+        "Launch Live GPU Duel runs the full Modal-backed agent loop and is queued to protect the demo budget."
         "</div>"
     )
         
@@ -557,13 +745,25 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="zinc", secondary_hue="zinc")
         elem_classes=["operation-terminal"]
     )
             
-    # Connect trigger to generator
+    demo_btn.click(
+        fn=run_demo_replay,
+        inputs=scenario_dropdown,
+        outputs=[operation_terminal, status_banner],
+        scroll_to_output=True,
+        concurrency_limit=20,
+        concurrency_id="demo_replay"
+    )
+
     launch_btn.click(
         fn=launch_duel,
         inputs=scenario_dropdown,
         outputs=[operation_terminal, status_banner],
-        scroll_to_output=True
+        scroll_to_output=True,
+        concurrency_limit=1,
+        concurrency_id="live_gpu_duel"
     )
+
+demo.queue(max_size=50, default_concurrency_limit=2)
 
 if __name__ == "__main__":
     demo.launch(server_name="0.0.0.0", server_port=7860)
