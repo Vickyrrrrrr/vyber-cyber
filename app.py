@@ -764,11 +764,10 @@ def launch_duel(scenario_name):
                 for red_out, blue_out, banner_txt in run_duel_stream.local(scenario_id, openai_api_key=openai_api_key):
                     yield format_operation_trace(red_out, blue_out), f"Status: {clean_console(banner_txt)}"
             except Exception as local_err:
+                print(f"Live GPU backend unavailable. Modal detail: {e}. Local fallback detail: {local_err}")
                 error_msg = (
                     "Live GPU backend is currently paused to save compute cost.\n"
-                    "Run Demo Replay now, or retry Live GPU Duel during the judging window.\n\n"
-                    f"Modal detail: {str(e)}\n"
-                    f"Local fallback detail: {str(local_err)}"
+                    "Run Demo Replay now, or retry Live GPU Duel during the judging window."
                 )
                 yield format_operation_trace(clean_console(error_msg), ""), "Status: Live GPU paused - demo replay is available"
     finally:
