@@ -243,7 +243,11 @@ html, body {
 .launch-button button,
 button.primary,
 button.primary span,
-.launch-button span {
+.launch-button span,
+#launch-duel-button,
+#launch-duel-button button,
+#launch-duel-button span,
+#launch-duel-button * {
     background-color: #802f1a !important;
     color: #ffffff !important;
     -webkit-text-fill-color: #ffffff !important;
@@ -474,7 +478,7 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="zinc", secondary_hue="zinc")
             label="Target Cyber-Range Scenario",
             elem_classes=["scenario-selector"]
         )
-        launch_btn = gr.Button("Launch Simulation Duel", variant="primary", elem_classes=["launch-button"])
+        launch_btn = gr.Button("Launch Simulation Duel", variant="primary", elem_id="launch-duel-button", elem_classes=["launch-button"])
 
     gr.HTML(
         "<div class='lab-note'>"

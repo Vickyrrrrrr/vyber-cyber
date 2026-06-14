@@ -4,6 +4,7 @@ import json
 import yaml
 import subprocess
 import shlex
+import shutil
 from typing import Generator
 import modal
 
@@ -466,9 +467,9 @@ image = (
     .apt_install("nmap", "curl", "git", "build-essential", "cmake", "clang")
     .run_commands(
         "ln -sf /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1",
-        "LD_LIBRARY_PATH=/usr/local/cuda/lib64/stubs:$LD_LIBRARY_PATH CMAKE_ARGS='-DGGML_CUDA=on' pip install llama-cpp-python",
-        "curl -fsSL https://opencode.ai/install | bash",
-        "ln -s /usr/local/bin/opencode /usr/local/bin/vyber"
+        "pip install 'llama-cpp-python==0.3.29' --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu121",
+        "OPENCODE_INSTALL_DIR=/usr/local/bin curl -fsSL https://opencode.ai/install | bash",
+        "OPENCODE_BIN=$(command -v opencode || find /root /usr/local /opt -type f -name opencode -perm -111 2>/dev/null | head -n 1); test -n \"$OPENCODE_BIN\"; ln -sf \"$OPENCODE_BIN\" /usr/local/bin/opencode; ln -sf \"$OPENCODE_BIN\" /usr/local/bin/vyber; /usr/local/bin/vyber --version || true"
     )
     .pip_install("openai", "gradio", "pyyaml", "huggingface_hub")
 )
@@ -616,18 +617,49 @@ def vyber_run(instruction: str, workspace_dir: str) -> str:
     res = subprocess.run(cmd, capture_output=True, text=True, cwd=workspace_dir)
     return f"[Vyber Agent SDK Fallback] Executing: {' '.join(cmd)}\n{res.stdout}\n{res.stderr}"
 
+def resolve_vyber_binary() -> str | None:
+    candidates = [
+        shutil.which("vyber"),
+        shutil.which("opencode"),
+        "/usr/local/bin/vyber",
+        "/usr/local/bin/opencode",
+        "/root/.opencode/bin/opencode",
+        "/root/.local/bin/opencode",
+        "/root/.cache/opencode/bin/opencode",
+    ]
+    for candidate in candidates:
+        if candidate and os.path.exists(candidate):
+            return candidate
+    return None
+
 def vyber_agent_run(task: str, workspace_dir: str, api_key: str = None, timeout: int = 180) -> dict:
     """
     Runs the Vyber/OpenCode harness as the Blue Team tool agent.
     The harness gets direct workspace access through its own read/edit/shell tools.
     """
     env = os.environ.copy()
+    env["PATH"] = "/root/.opencode/bin:/root/.local/bin:/root/.cache/opencode/bin:/usr/local/bin:" + env.get("PATH", "")
     if api_key:
         env["OPENAI_API_KEY"] = api_key
 
+    binary = resolve_vyber_binary()
+    if not binary:
+        return {
+            "ok": False,
+            "returncode": 127,
+            "stdout": "",
+            "stderr": (
+                "Vyber harness unavailable: no vyber/opencode executable found.\n"
+                f"PATH={env.get('PATH', '')}\n"
+                "searched=/usr/local/bin/vyber,/usr/local/bin/opencode,"
+                "/root/.opencode/bin/opencode,/root/.local/bin/opencode,"
+                "/root/.cache/opencode/bin/opencode"
+            ),
+        }
+
     try:
         res = subprocess.run(
-            ["vyber", "run", task],
+            [binary, "run", task],
             capture_output=True,
             text=True,
             cwd=workspace_dir,
