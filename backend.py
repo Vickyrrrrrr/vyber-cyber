@@ -202,7 +202,7 @@ class ModelServer:
             
             # Tiered model search to automatically load the best available model
             model_options = [
-                ("vxkyyy/vyber-security-7b-gguf", "vyber-security-7b-Q4_K_M.gguf"),
+                ("vxkyyy/vyber-security-7b-gguf", "vyber-security-7b.gguf"),
                 ("vxkyyy/vyber-security-1.5b-gguf", "vyber-security-1.5b.gguf"),
                 ("Qwen/Qwen2.5-7B-Instruct-GGUF", "qwen2.5-7b-instruct-q4_k_m.gguf"),
                 ("Qwen/Qwen2.5-1.5B-Instruct-GGUF", "qwen2.5-1.5b-instruct-q8_0.gguf")
