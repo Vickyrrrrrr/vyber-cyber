@@ -454,7 +454,7 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="zinc", secondary_hue="zinc")
     gr.HTML(
         "<div class='lab-note'>"
         "<strong>Curated lab packs:</strong> choose the original Vyber config range or OWASP-inspired vulnerable app patterns. "
-        "Every run is generated inside an isolated sandbox, streamed live, patched by the Blue Agent, and verified by deterministic validators."
+        "Every run is generated inside an isolated sandbox, streamed live, patched by the Blue Agent, and verified by Red re-running the same exploit attempt."
         "</div>"
     )
         

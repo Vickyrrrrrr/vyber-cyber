@@ -18,7 +18,7 @@ The core idea is simple:
 
 1. The **Red Team Agent** finds the vulnerability.
 2. The **Blue Team Agent** patches the vulnerability.
-3. The validator checks whether the target is actually secure.
+3. The **Red Team Agent re-runs the same exploit** to prove whether the patch actually blocked the attack.
 
 Vyber is designed as a safe, defensive demo. The included app runs against controlled sandbox files, not real third-party infrastructure.
 
@@ -86,7 +86,7 @@ Public GitHub repository for the Codex prize track:
 ```text
 .
 ├── app.py              # Gradio dashboard and Modal function client
-├── backend.py          # Modal backend, model server, agent loop, sandbox validators
+├── backend.py          # Modal backend, model server, agent loop, Red re-attack checks
 ├── requirements.txt    # Local Gradio app dependencies
 └── README.md           # Project documentation and Hugging Face Space card
 ```
@@ -140,9 +140,9 @@ Example remediation actions:
 - Scrub sensitive data from logs
 - Disable public admin endpoints
 
-### 4. Validation Loop
+### 4. Red Re-Attack Loop
 
-After each round, the validator checks the actual file contents and permissions. The run continues for up to three rounds or until every vulnerability is patched.
+After Blue patches the files, Red re-runs the same exploit recipe that discovered the weakness. A vulnerability is considered fixed only when that exploit attempt is blocked.
 
 ## Running Locally
 
@@ -240,7 +240,7 @@ For each server type, add validation rules similar to the existing scenario chec
 - File permissions: world-readable secret files or deploy scripts
 - Logs: exposed tokens, payment data, credentials, or PII
 
-The validator is what makes Vyber more than a chatbot. It checks whether the system is actually safer after the patch.
+The re-attack loop is what makes Vyber more than a chatbot. Red must prove the original exploit no longer works after Blue patches the target.
 
 ### 4. Run In Review Mode First
 
@@ -251,9 +251,9 @@ For real infrastructure, the safest flow is:
 3. Generate patch diff.
 4. Human reviews patch.
 5. Apply patch.
-6. Run validator again.
+6. Re-run the original exploit attempt.
 
-Only enable fully automatic remediation after you trust the target profile and validators.
+Only enable fully automatic remediation after you trust the target profile and re-attack checks.
 
 ## Safety Boundaries
 

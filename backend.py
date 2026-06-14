@@ -416,6 +416,40 @@ class CyberRangeScenarios:
         summary = ", ".join(f"{v['id']}({v['cwe']})" for v in remaining)
         return False, f"{len(remaining)}/{len(vulns)} vulnerabilities remain: {summary}"
 
+    @staticmethod
+    def exploit_attempts(scenario_id: int, base_dir: str) -> list[dict]:
+        exploit_recipes = {
+            "S1-V1": "Extract hardcoded database password and API key from app_config.json.",
+            "S1-V2": "Harvest cloud/payment credentials from server.env.",
+            "S1-V3": "Read deploy.sh as an untrusted user and recover embedded DB password.",
+            "S2-V1": "Connect to PostgreSQL on public bind address without authentication.",
+            "S2-V2": "Negotiate deprecated SSL/TLS protocol or weak cipher from nginx.conf.",
+            "S2-V3": "Reach unrestricted inbound service through 0.0.0.0/0 allow rules.",
+            "S3-V1": "Intercept billing stream over HTTP with SSL and certificate checks disabled.",
+            "S3-V2": "Recover card data and CVV from plaintext traffic logs.",
+            "S3-V3": "Call public admin API without auth or rate-limit controls.",
+            "S4-V1": "Bypass login using username/password payload `' OR '1'='1`.",
+            "S4-V2": "Exploit weak session cookies and missing CSRF controls.",
+            "S4-V3": "Recover password payload and reset token from access_audit.log.",
+            "S5-V1": "Forge an unsigned admin JWT using alg=none / jwt.decode trust.",
+            "S5-V2": "Abuse wildcard CORS, missing auth, no rate limit, and public admin routes.",
+            "S5-V3": "Exfiltrate card number, CVV, and JWT-like token from debug logs.",
+            "S6-V1": "Trigger unsafe object deserialization through pickle.loads payload.",
+            "S6-V2": "Upload arbitrary executable content through wildcard upload policy.",
+            "S6-V3": "Escalate through root worker shell and unrestricted network egress.",
+        }
+        attempts = []
+        for vuln in CyberRangeScenarios.list_vulnerabilities(scenario_id, base_dir):
+            blocked = vuln["fixed"]
+            attempts.append({
+                **vuln,
+                "attack": exploit_recipes.get(vuln["id"], f"Re-run exploit for {vuln['description']}."),
+                "blocked": blocked,
+                "result": "BLOCKED" if blocked else "STILL ACTIVE",
+                "evidence": vuln["detail"],
+            })
+        return attempts
+
 
 # ==========================================
 # Modal Serverless Setup
@@ -603,7 +637,7 @@ def remediation_hint(vuln_id: str) -> str:
         "S6-V2": "remove wildcard upload extensions, enable scanning, store outside webroot, and cap size at 10MB or less",
         "S6-V3": "run worker as non-root, disallow shell spawning, and restrict network egress",
     }
-    return hints.get(vuln_id, "apply the least-privilege secure configuration required by the validator")
+    return hints.get(vuln_id, "apply the least-privilege secure configuration required to block the red re-attack")
 
 def normalize_exploit_report(report: str, expected_vulns: list[dict]) -> str:
     expected_ids = {v["id"] for v in expected_vulns}
@@ -1049,7 +1083,7 @@ PATCH STANDARD:
   - Use production-safe defaults: least privilege, parameterized inputs, secure cookies, scoped CORS, TLS, auth, rate limits, safe parsers, and sanitized logs.
   - Output complete replacement file contents, not snippets.
   - Never wrap CONTENT in markdown fences.
-  - After each action, wait for the next observation. Output PATCH_COMPLETE only after all validator criteria are satisfied.
+  - After each action, wait for the next observation. Output PATCH_COMPLETE only after all red re-attack attempts are blocked.
 
 TOOLS:
   ACTION: edit <filepath>    — rewrite a file (provide CONTENT: block)
@@ -1057,14 +1091,14 @@ TOOLS:
 
 OUTPUT FORMAT (one action per response):
 THINK: <one-line technical reasoning>
-PATCH_META: vuln=<vuln_id> control=<security control applied> validates=<expected validator result>
+PATCH_META: vuln=<vuln_id> control=<security control applied> blocks=<expected red re-attack result>
 ACTION: edit /tmp/sandbox/<filename>
 CONTENT:
 <full new secure file content>
 
 OR:
 THINK: <one-line reasoning>
-PATCH_META: vuln=<vuln_id> control=<security control applied> validates=<expected validator result>
+PATCH_META: vuln=<vuln_id> control=<security control applied> blocks=<expected red re-attack result>
 ACTION: vyber <command>
 
 Patch ALL vulnerabilities. When every vuln is fixed output: PATCH_COMPLETE"""
@@ -1074,23 +1108,23 @@ Patch ALL vulnerabilities. When every vuln is fixed output: PATCH_COMPLETE"""
                 response = model_server.generate.remote(blue_prompt, openai_api_key)
 
                 if "PATCH_COMPLETE" in response:
-                    check_vulns = CyberRangeScenarios.list_vulnerabilities(scenario_id, base_dir)
-                    check_open = [v for v in check_vulns if not v["fixed"]]
+                    check_attempts = CyberRangeScenarios.exploit_attempts(scenario_id, base_dir)
+                    check_open = [v for v in check_attempts if not v["blocked"]]
                     if not check_open:
-                        blue_terminal += f"  [{ts()}] PATCH_COMPLETE accepted by validator\n"
+                        blue_terminal += f"  [{ts()}] PATCH_COMPLETE accepted: red re-attack blocked\n"
                         break
-                    validator_feedback = "; ".join(
-                        f"{v['id']} {v['file']} still open: {v['detail']} | required: {remediation_hint(v['id'])}"
+                    reattack_feedback = "; ".join(
+                        f"{v['id']} exploit still works: {v['attack']} | evidence: {v['evidence']} | required: {remediation_hint(v['id'])}"
                         for v in check_open
                     )
-                    blue_terminal += f"  [{ts()}] PATCH_COMPLETE rejected by validator\n"
-                    blue_terminal += f"  [{ts()}] OPEN   {validator_feedback}\n"
+                    blue_terminal += f"  [{ts()}] PATCH_COMPLETE rejected: red re-attack still succeeds\n"
+                    blue_terminal += f"  [{ts()}] ACTIVE {reattack_feedback}\n"
                     blue_prompt += (
-                        "\nVALIDATOR_REJECTED_PATCH_COMPLETE:\n"
-                        f"{validator_feedback}\n"
+                        "\nRED_REATTACK_REJECTED_PATCH_COMPLETE:\n"
+                        f"{reattack_feedback}\n"
                         "Continue with ACTION: edit or ACTION: vyber. Do not output PATCH_COMPLETE until no vulnerabilities remain.\nNext:"
                     )
-                    yield (red_terminal, blue_terminal, f"Round {round_num} — validator rejected incomplete patch")
+                    yield (red_terminal, blue_terminal, f"Round {round_num} — red re-attack rejected incomplete patch")
                     time.sleep(0.8)
                     continue
 
@@ -1113,13 +1147,13 @@ Patch ALL vulnerabilities. When every vuln is fixed output: PATCH_COMPLETE"""
                         with open(filepath, "w") as f:
                             f.write(content)
                     blue_terminal += fmt_tool(f"write {os.path.basename(filepath)}", content[:300] + ("..." if len(content) > 300 else ""))
-                    after_vulns = CyberRangeScenarios.list_vulnerabilities(scenario_id, base_dir)
-                    after_open = [v for v in after_vulns if not v["fixed"]]
-                    validator_state = "all validators passed" if not after_open else "; ".join(
-                        f"{v['id']} open: {v['detail']}" for v in after_open
+                    after_attempts = CyberRangeScenarios.exploit_attempts(scenario_id, base_dir)
+                    after_open = [v for v in after_attempts if not v["blocked"]]
+                    reattack_state = "all exploit attempts blocked" if not after_open else "; ".join(
+                        f"{v['id']} active: {v['attack']} ({v['evidence']})" for v in after_open
                     )
                     yield (red_terminal, blue_terminal, f"Round {round_num} — patch applied to {os.path.basename(filepath)}")
-                    blue_prompt += f"\nTHINK: {think}\nACTION: edit {filepath}\nResult: written.\nVALIDATOR_STATE: {validator_state}\nNext:"
+                    blue_prompt += f"\nTHINK: {think}\nACTION: edit {filepath}\nResult: written.\nRED_REATTACK_STATE: {reattack_state}\nNext:"
                     time.sleep(0.8)
 
                 elif "ACTION: vyber" in response:
@@ -1131,13 +1165,13 @@ Patch ALL vulnerabilities. When every vuln is fixed output: PATCH_COMPLETE"""
                     blue_terminal += f"  [{ts()}] ACTION vyber {cmd}\n"
                     out = vyber_run(cmd, base_dir)
                     blue_terminal += fmt_tool(cmd, out)
-                    after_vulns = CyberRangeScenarios.list_vulnerabilities(scenario_id, base_dir)
-                    after_open = [v for v in after_vulns if not v["fixed"]]
-                    validator_state = "all validators passed" if not after_open else "; ".join(
-                        f"{v['id']} open: {v['detail']}" for v in after_open
+                    after_attempts = CyberRangeScenarios.exploit_attempts(scenario_id, base_dir)
+                    after_open = [v for v in after_attempts if not v["blocked"]]
+                    reattack_state = "all exploit attempts blocked" if not after_open else "; ".join(
+                        f"{v['id']} active: {v['attack']} ({v['evidence']})" for v in after_open
                     )
                     yield (red_terminal, blue_terminal, f"Round {round_num} — hardening: {cmd}")
-                    blue_prompt += f"\nTHINK: {think}\nACTION: vyber {cmd}\nSTDOUT:\n{out}\nVALIDATOR_STATE: {validator_state}\nNext:"
+                    blue_prompt += f"\nTHINK: {think}\nACTION: vyber {cmd}\nSTDOUT:\n{out}\nRED_REATTACK_STATE: {reattack_state}\nNext:"
                     time.sleep(0.8)
                 else:
                     blue_terminal += f"  [{ts()}] RESPONSE rejected: no actionable patch command\n"
@@ -1150,45 +1184,48 @@ Patch ALL vulnerabilities. When every vuln is fixed output: PATCH_COMPLETE"""
                     time.sleep(0.8)
                     continue
 
-            # ── POST-ROUND SCOREBOARD ─────────────────────────────────
-            current_vulns = CyberRangeScenarios.list_vulnerabilities(scenario_id, base_dir)
-            fixed_now = [v for v in current_vulns if v["fixed"]]
-            still_open = [v for v in current_vulns if not v["fixed"]]
+            # ── RED RE-ATTACK VERIFICATION ───────────────────────────────
+            attempts = CyberRangeScenarios.exploit_attempts(scenario_id, base_dir)
+            still_active = [v for v in attempts if not v["blocked"]]
 
-            red_terminal += fmt_section(f"ROUND {round_num}  SCOREBOARD")
-            blue_terminal += fmt_section(f"ROUND {round_num}  SCOREBOARD")
-            for v in current_vulns:
-                status = "✓ FIXED " if v["fixed"] else "✗ OPEN  "
-                red_terminal  += f"  [{status}]  {v['id']}  {v['file']}\n"
-                blue_terminal += f"  [{status}]  {v['id']}  {v['file']}\n"
+            red_terminal += fmt_section(f"ROUND {round_num}  RED RE-ATTACK VERIFICATION")
+            blue_terminal += fmt_section(f"ROUND {round_num}  RED RE-ATTACK VERIFICATION")
+            for v in attempts:
+                status = "BLOCKED" if v["blocked"] else "ACTIVE "
+                line = f"  [{status}]  {v['id']}  {v['file']}  attack={v['attack']}\n"
+                red_terminal += line
+                blue_terminal += line
+                if not v["blocked"]:
+                    red_terminal += f"            evidence={v['evidence']}\n"
+                    blue_terminal += f"            evidence={v['evidence']}\n"
 
-            red_terminal  += f"\n  [{ts()}] remaining : {len(still_open)}/{len(current_vulns)}\n"
-            blue_terminal += f"\n  [{ts()}] remaining : {len(still_open)}/{len(current_vulns)}\n"
-            yield (red_terminal, blue_terminal, f"Round {round_num} complete — {len(still_open)} vulns remaining")
+            red_terminal  += f"\n  [{ts()}] active exploits : {len(still_active)}/{len(attempts)}\n"
+            blue_terminal += f"\n  [{ts()}] active exploits : {len(still_active)}/{len(attempts)}\n"
+            yield (red_terminal, blue_terminal, f"Round {round_num} complete — red re-attack found {len(still_active)} active exploits")
             time.sleep(1.0)
 
     # ── FINAL VERDICT ────────────────────────────────────────────────
-    final_vulns = CyberRangeScenarios.list_vulnerabilities(scenario_id, base_dir)
-    all_fixed = all(v["fixed"] for v in final_vulns)
+    final_attempts = CyberRangeScenarios.exploit_attempts(scenario_id, base_dir)
+    all_fixed = all(v["blocked"] for v in final_attempts)
 
     red_terminal  += fmt_section("FINAL VERDICT")
     blue_terminal += fmt_section("FINAL VERDICT")
 
-    for v in final_vulns:
-        status = "✓ PATCHED" if v["fixed"] else "✗ EXPOSED"
+    for v in final_attempts:
+        status = "BLOCKED" if v["blocked"] else "ACTIVE "
         red_terminal  += f"  [{status}]  {v['id']}  {v['cwe']}  {v['file']}\n"
         blue_terminal += f"  [{status}]  {v['id']}  {v['cwe']}  {v['file']}\n"
 
     if all_fixed:
         red_terminal  += f"\n  [{ts()}] verdict : ✗ ALL EXPLOITS BLOCKED\n"
         red_terminal  += f"  [{ts()}] result  : SYSTEM SECURE\n"
-        blue_terminal += f"\n  [{ts()}] verdict : ✓ ALL {len(final_vulns)} VULNERABILITIES PATCHED\n"
+        blue_terminal += f"\n  [{ts()}] verdict : ✓ ALL {len(final_attempts)} EXPLOITS BLOCKED BY PATCHES\n"
         blue_terminal += f"  [{ts()}] result  : SYSTEM SECURE\n"
-        yield (red_terminal, blue_terminal, f"✓ Secure — all {len(final_vulns)} vulnerabilities patched")
+        yield (red_terminal, blue_terminal, f"✓ Secure — red re-attack blocked all {len(final_attempts)} exploits")
     else:
-        open_count = sum(1 for v in final_vulns if not v["fixed"])
+        open_count = sum(1 for v in final_attempts if not v["blocked"])
         red_terminal  += f"\n  [{ts()}] verdict : ✗ {open_count} EXPLOITS STILL ACTIVE\n"
         red_terminal  += f"  [{ts()}] result  : SYSTEM COMPROMISED\n"
-        blue_terminal += f"\n  [{ts()}] verdict : ✗ {open_count} VULNERABILITIES UNPATCHED\n"
+        blue_terminal += f"\n  [{ts()}] verdict : ✗ {open_count} RED RE-ATTACKS STILL SUCCEED\n"
         blue_terminal += f"  [{ts()}] result  : SYSTEM AT RISK\n"
-        yield (red_terminal, blue_terminal, f"✗ {open_count}/{len(final_vulns)} vulnerabilities remain unpatched")
+        yield (red_terminal, blue_terminal, f"✗ {open_count}/{len(final_attempts)} red re-attacks still succeed")
