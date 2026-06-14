@@ -158,13 +158,24 @@ html, body {
     margin: 0 !important;
     white-space: pre-wrap !important;
     overflow-wrap: anywhere !important;
-    color: #d8d0c4 !important;
+    color: #f0e7d8 !important;
+    -webkit-text-fill-color: #f0e7d8 !important;
     font-family: 'JetBrains Mono', 'Fira Code', monospace !important;
-    font-size: 0.84rem !important;
+    font-size: 0.88rem !important;
     font-weight: 400 !important;
-    line-height: 1.58 !important;
+    line-height: 1.62 !important;
     text-shadow: none !important;
     background: transparent !important;
+}
+
+.operation-terminal pre,
+.operation-terminal code,
+.operation-terminal div,
+.operation-shell pre,
+.dark .operation-terminal pre,
+.dark .operation-shell pre {
+    color: #f0e7d8 !important;
+    -webkit-text-fill-color: #f0e7d8 !important;
 }
 
 .operation-shell,
@@ -376,7 +387,12 @@ def format_operation_trace(red_out, blue_out):
         ])
 
     text = "\n".join(lines)
-    return "<div class='operation-shell'><pre>" + html.escape(text) + "</pre></div>"
+    return (
+        "<div class='operation-shell'>"
+        "<pre style='color:#f0e7d8 !important;-webkit-text-fill-color:#f0e7d8 !important;'>"
+        + html.escape(text) +
+        "</pre></div>"
+    )
 
 def launch_duel(scenario_name):
     scenario_id = SCENARIO_MAP.get(scenario_name, 1)
