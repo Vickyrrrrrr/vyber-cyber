@@ -234,14 +234,6 @@ Vyber naturally demonstrates several sponsor technologies:
 
 This makes the project a strong fit for agentic app judging, Modal-powered app judging, custom Gradio UI judging, and fine-tuned model judging.
 
-## Submission Assets
-
-| Asset | Link |
-| --- | --- |
-| Hugging Face Space | [`build-small-hackathon/vyber-cyber`](https://huggingface.co/spaces/build-small-hackathon/vyber-cyber) |
-| Model | [`vxkyyy/vyber-security-7b-gguf`](https://huggingface.co/vxkyyy/vyber-security-7b-gguf) |
-| Source code | [`Vickyrrrrrr/vyber-cyber`](https://github.com/Vickyrrrrrr/vyber-cyber) |
-
 ## Future Upgrades
 
 ### 1. OWASP Lab Container Mode
