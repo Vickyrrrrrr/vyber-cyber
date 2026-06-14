@@ -66,11 +66,17 @@ body {
 
 /* Terminals Styling - Classy dark terminal box on cream page for both light/dark wrapper states */
 .red-terminal textarea, .blue-terminal textarea,
-.dark .red-terminal textarea, .dark .blue-terminal textarea {
+.red-terminal textarea:disabled, .blue-terminal textarea:disabled,
+.red-terminal textarea[readonly], .blue-terminal textarea[readonly],
+.dark .red-terminal textarea, .dark .blue-terminal textarea,
+.dark .red-terminal textarea:disabled, .dark .blue-terminal textarea:disabled,
+.dark .red-terminal textarea[readonly], .dark .blue-terminal textarea[readonly] {
     background-color: #181615 !important;
     border: 1px solid #e6dfd5 !important;
     border-radius: 4px !important;
     color: #faf8f5 !important;
+    -webkit-text-fill-color: #faf8f5 !important;
+    opacity: 1 !important;
     font-family: 'JetBrains Mono', monospace !important;
     font-size: 0.875rem !important;
     line-height: 1.6 !important;
