@@ -7,36 +7,65 @@ import modal
 css = """
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:ital,wght@0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap');
 
-/* Force consistent CSS variables across both light and dark modes to prevent day/night glitches */
-:root, html, body, .gradio-container, 
-.dark, html.dark, .dark body, .dark .gradio-container {
-    --body-background-fill: #faf8f5 !important;
-    --body-text-color: #231f1d !important;
-    --background-fill-primary: #faf8f5 !important;
-    --background-fill-secondary: #f2ece4 !important;
-    --border-color-primary: #e6dfd5 !important;
-    --border-color-secondary: #e6dfd5 !important;
-    --input-background-fill: #ffffff !important;
-    --input-border-color: #e6dfd5 !important;
-    --input-text-color: #231f1d !important;
-    --block-background-fill: #ffffff !important;
-    --block-border-color: #e6dfd5 !important;
-    --block-title-text-color: #231f1d !important;
-    --block-label-text-color: #594c43 !important;
-    --button-primary-background-fill: #802f1a !important;
+/* ============================================================
+   GLOBAL PALETTE LOCK — prevents ALL Gradio dark-mode bleed
+   Applied to every selector Gradio uses for theming
+   ============================================================ */
+:root,
+html,
+body,
+.gradio-container,
+.dark,
+html.dark,
+.dark body,
+.dark .gradio-container,
+.dark .block,
+.dark .form,
+.dark .wrap,
+[data-testid="block"],
+.dark [data-testid="block"] {
+    --body-background-fill:          #faf8f5 !important;
+    --body-text-color:               #231f1d !important;
+    --background-fill-primary:       #faf8f5 !important;
+    --background-fill-secondary:     #f2ece4 !important;
+    --border-color-primary:          #e6dfd5 !important;
+    --border-color-secondary:        #e6dfd5 !important;
+    --input-background-fill:         #ffffff !important;
+    --input-border-color:            #e6dfd5 !important;
+    --input-text-color:              #231f1d !important;
+    --block-background-fill:         #ffffff !important;
+    --block-border-color:            #e6dfd5 !important;
+    --block-title-text-color:        #231f1d !important;
+    --block-label-text-color:        #594c43 !important;
+    --button-primary-background-fill:       #802f1a !important;
     --button-primary-background-fill-hover: #692412 !important;
-    --button-primary-text-color: #ffffff !important;
-    --button-primary-border-color: #802f1a !important;
+    --button-primary-text-color:     #ffffff !important;
+    --button-primary-border-color:   #802f1a !important;
     --button-secondary-background-fill: #ffffff !important;
-    --button-secondary-text-color: #231f1d !important;
+    --button-secondary-text-color:   #231f1d !important;
     --button-secondary-border-color: #e6dfd5 !important;
+    --color-accent:                  #802f1a !important;
+    --link-text-color:               #802f1a !important;
+    --link-text-color-hover:         #692412 !important;
+    --shadow-drop:                   none !important;
+    --shadow-drop-lg:                none !important;
+    --shadow-inset:                  none !important;
     background-color: #faf8f5 !important;
     color: #231f1d !important;
 }
 
-body {
+/* ============================================================
+   BASE ELEMENTS — no text shadows, no dark bleed
+   ============================================================ */
+*, *::before, *::after {
+    text-shadow: none !important;
+    box-shadow: none !important;
+}
+
+html, body {
     background-color: #faf8f5 !important;
     color: #231f1d !important;
+    -webkit-text-fill-color: #231f1d !important;
     font-family: 'Inter', -apple-system, sans-serif !important;
     -webkit-font-smoothing: antialiased;
 }
