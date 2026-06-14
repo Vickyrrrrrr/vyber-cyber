@@ -764,8 +764,13 @@ def launch_duel(scenario_name):
                 for red_out, blue_out, banner_txt in run_duel_stream.local(scenario_id, openai_api_key=openai_api_key):
                     yield format_operation_trace(red_out, blue_out), f"Status: {clean_console(banner_txt)}"
             except Exception as local_err:
-                error_msg = f"Red Team Agent connection error:\n{str(e)}\nLocal Fallback error:\n{str(local_err)}"
-                yield format_operation_trace(clean_console(error_msg), ""), "Status: Connection Error"
+                error_msg = (
+                    "Live GPU backend is currently paused to save compute cost.\n"
+                    "Run Demo Replay now, or retry Live GPU Duel during the judging window.\n\n"
+                    f"Modal detail: {str(e)}\n"
+                    f"Local fallback detail: {str(local_err)}"
+                )
+                yield format_operation_trace(clean_console(error_msg), ""), "Status: Live GPU paused - demo replay is available"
     finally:
         LIVE_GPU_LOCK.release()
 
@@ -800,7 +805,7 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="zinc", secondary_hue="zinc")
     gr.HTML(
         "<div class='lab-note'>"
         "<strong>Public demo mode:</strong> Run Demo Replay is instant and uses no GPU credits. "
-        "Launch Live GPU Duel runs the full Modal-backed agent loop and is queued to protect the demo budget."
+        "Live GPU may be paused to save compute and enabled during judging windows."
         "</div>"
     )
         
