@@ -82,8 +82,9 @@ def train_and_convert_gguf(hf_token: str, repo_id: str):
         task_type="CAUSAL_LM"
     )
 
-    # 4. Training Arguments
-    training_args = TrainingArguments(
+    # 4. Training Arguments (Using SFTConfig to support modern TRL versions)
+    from trl import SFTConfig
+    training_args = SFTConfig(
         output_dir="/tmp/results",
         per_device_train_batch_size=2,
         gradient_accumulation_steps=4,
@@ -92,7 +93,9 @@ def train_and_convert_gguf(hf_token: str, repo_id: str):
         max_steps=50, # Fast training suitable for a demo/badge verification
         fp16=True,
         optim="adamw_torch",
-        report_to="none"
+        report_to="none",
+        dataset_text_field="text",
+        max_seq_length=512
     )
 
     # 5. Initialize SFTTrainer
@@ -100,9 +103,7 @@ def train_and_convert_gguf(hf_token: str, repo_id: str):
     trainer = SFTTrainer(
         model=model,
         train_dataset=dataset,
-        dataset_text_field="text",
         peft_config=peft_config,
-        max_seq_length=512,
         tokenizer=tokenizer,
         args=training_args
     )
