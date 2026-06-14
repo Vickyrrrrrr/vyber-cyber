@@ -10,6 +10,29 @@ app_file: app.py
 pinned: false
 ---
 
+<p align="center">
+  <img src="assets/vyber-hero.svg" alt="Vyber Duel hero banner" width="100%">
+</p>
+
+<p align="center">
+  <a href="https://huggingface.co/spaces/build-small-hackathon/vyber-cyber"><strong>Launch Space</strong></a>
+  ·
+  <a href="https://huggingface.co/vxkyyy/vyber-security-7b-gguf"><strong>Model</strong></a>
+  ·
+  <a href="https://github.com/Vickyrrrrrr/vyber-cyber"><strong>Source</strong></a>
+  ·
+  <a href="https://huggingface.co/build-small-hackathon"><strong>Build Small Hackathon</strong></a>
+</p>
+
+<p align="center">
+  <code>Gradio Space</code>
+  <code>Fine-tuned 7B</code>
+  <code>GGUF</code>
+  <code>llama.cpp</code>
+  <code>Modal GPU</code>
+  <code>Red-to-Blue Agent Loop</code>
+</p>
+
 # Vyber
 
 **Vyber** is a self-healing cyber-range for the [Hugging Face Build Small Hackathon](https://huggingface.co/build-small-hackathon). It runs a two-agent security loop where a Red Agent finds vulnerable server patterns, a Blue Agent patches the files inside an isolated sandbox, and Red replays the same exploit path to verify whether the fix actually worked.

@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="430" viewBox="0 0 1200 430" role="img" aria-labelledby="title desc">
+  <title id="title">Vyber Duel hero banner</title>
+  <desc id="desc">A refined product banner for Vyber, a self-healing cyber-range where Red finds vulnerabilities, Blue patches them, and Red verifies the fix.</desc>
+  <defs>
+    <linearGradient id="warm" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fffaf3"/>
+      <stop offset="1" stop-color="#f2ece4"/>
+    </linearGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="16" flood-color="#231f1d" flood-opacity="0.08"/>
+    </filter>
+    <style>
+      .bg { fill: url(#warm); }
+      .border { fill: none; stroke: #e3d7c8; stroke-width: 1.5; }
+      .ink { fill: #231f1d; font-family: Inter, Arial, sans-serif; }
+      .serif { fill: #231f1d; font-family: Georgia, 'Times New Roman', serif; font-weight: 700; }
+      .muted { fill: #594c43; font-family: Inter, Arial, sans-serif; }
+      .rust { fill: #802f1a; }
+      .pill { fill: #f7f2eb; stroke: #e0d3c2; stroke-width: 1; }
+      .terminal { fill: #111312; stroke: #802f1a; stroke-width: 2; }
+      .termtext { fill: #f7efe7; font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 15px; }
+      .termfade { fill: #b7a99a; font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; }
+      .line { stroke: #9f897a; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+      .lineRust { stroke: #802f1a; stroke-width: 2.5; fill: none; marker-end: url(#arrowRust); }
+      .card { fill: #ffffff; stroke: #e1d5c6; stroke-width: 1.2; filter: url(#soft); }
+      .smallcap { fill: #802f1a; font: 700 13px Inter, Arial, sans-serif; letter-spacing: 3px; }
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L9,3 L0,6 Z" fill="#9f897a"/>
+    </marker>
+    <marker id="arrowRust" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L9,3 L0,6 Z" fill="#802f1a"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" x="8" y="8" width="1184" height="414" rx="28"/>
+  <rect class="border" x="8" y="8" width="1184" height="414" rx="28"/>
+
+  <text x="76" y="86" class="smallcap">AUTONOMOUS SELF-HEALING CYBER-RANGE</text>
+  <text x="76" y="158" class="serif" font-size="72">Vyber Duel</text>
+  <text x="80" y="205" class="muted" font-size="22">Red finds the exploit. Blue patches the code.</text>
+  <text x="80" y="236" class="muted" font-size="22">Red replays the same attack to prove the fix.</text>
+
+  <rect class="pill" x="80" y="278" width="205" height="38" rx="19"/>
+  <text x="182" y="302" class="ink" font-size="15" font-weight="700" text-anchor="middle">Fine-tuned 7B model</text>
+  <rect class="pill" x="300" y="278" width="178" height="38" rx="19"/>
+  <text x="389" y="302" class="ink" font-size="15" font-weight="700" text-anchor="middle">llama.cpp GGUF</text>
+  <rect class="pill" x="493" y="278" width="173" height="38" rx="19"/>
+  <text x="580" y="302" class="ink" font-size="15" font-weight="700" text-anchor="middle">Modal GPU worker</text>
+
+  <rect class="card" x="720" y="64" width="370" height="92" rx="14"/>
+  <text x="752" y="103" class="rust" font-size="18" font-family="Inter, Arial, sans-serif" font-weight="700">01  Red Agent</text>
+  <text x="752" y="130" class="muted" font-size="17">inspect files and commit exploit report</text>
+
+  <rect class="card" x="720" y="186" width="370" height="92" rx="14"/>
+  <text x="752" y="225" class="rust" font-size="18" font-family="Inter, Arial, sans-serif" font-weight="700">02  Blue Agent</text>
+  <text x="752" y="252" class="muted" font-size="17">patch files through the Vyber harness</text>
+
+  <rect class="card" x="720" y="308" width="370" height="72" rx="14"/>
+  <text x="752" y="350" class="rust" font-size="18" font-family="Inter, Arial, sans-serif" font-weight="700">03  Red Re-Attack Verification</text>
+
+  <path class="lineRust" d="M905 156 L905 186"/>
+  <path class="lineRust" d="M905 278 L905 308"/>
+
+  <rect class="terminal" x="80" y="342" width="586" height="40" rx="8"/>
+  <text x="106" y="368" class="termtext">PASS secure</text>
+  <text x="214" y="368" class="termfade">red re-attack blocked all exploits</text>
+</svg>
