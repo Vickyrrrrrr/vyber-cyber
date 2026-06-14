@@ -472,7 +472,7 @@ image = (
         "ln -sf /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1",
         "pip install 'llama-cpp-python==0.3.29' --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu121",
         "OPENCODE_INSTALL_DIR=/usr/local/bin curl -fsSL https://opencode.ai/install | bash",
-        "OPENCODE_BIN=$(command -v opencode || find /root /usr/local /opt -type f -name opencode -perm -111 2>/dev/null | head -n 1); test -n \"$OPENCODE_BIN\"; ln -sf \"$OPENCODE_BIN\" /usr/local/bin/opencode; ln -sf \"$OPENCODE_BIN\" /usr/local/bin/vyber; /usr/local/bin/vyber --version || true"
+        "VYBER_AGENT_BIN=$(command -v opencode || find /root /usr/local /opt -type f -name opencode -perm -111 2>/dev/null | head -n 1); test -n \"$VYBER_AGENT_BIN\"; ln -sf \"$VYBER_AGENT_BIN\" /usr/local/bin/opencode; ln -sf \"$VYBER_AGENT_BIN\" /usr/local/bin/vyber; /usr/local/bin/vyber --version || true"
     )
     .pip_install("openai", "gradio", "pyyaml", "huggingface_hub")
 )
@@ -560,7 +560,7 @@ def vyber_run(instruction: str, workspace_dir: str) -> str:
     """
     Runs the small Red Team tool surface inside the sandbox.
     Keep this deterministic: Red can list and read lab files without invoking
-    the larger OpenCode harness, so recon logs stay scoped to /tmp/sandbox.
+    the larger Vyber harness, so recon logs stay scoped to /tmp/sandbox.
     """
     instruction_lower = instruction.lower().strip()
     workspace_abs = os.path.abspath(workspace_dir)
@@ -628,9 +628,15 @@ def resolve_vyber_binary() -> str | None:
             return candidate
     return None
 
+def vyber_binary_search_summary() -> str:
+    return (
+        "searched=/usr/local/bin/vyber,/root/.vyber/bin/vyber,"
+        "/root/.local/bin/vyber,/root/.cache/vyber/bin/vyber"
+    )
+
 def vyber_agent_run(task: str, workspace_dir: str, api_key: str = None, timeout: int = 180) -> dict:
     """
-    Runs the Vyber/OpenCode harness as the Blue Team tool agent.
+    Runs the Vyber harness as the Blue Team tool agent.
     The harness gets direct workspace access through its own read/edit/shell tools.
     """
     env = os.environ.copy()
@@ -663,11 +669,9 @@ def vyber_agent_run(task: str, workspace_dir: str, api_key: str = None, timeout:
             "returncode": 127,
             "stdout": "",
             "stderr": (
-                "Vyber harness unavailable: no vyber/opencode executable found.\n"
+                "Vyber harness unavailable: no executable found.\n"
                 f"PATH={env.get('PATH', '')}\n"
-                "searched=/usr/local/bin/vyber,/usr/local/bin/opencode,"
-                "/root/.opencode/bin/opencode,/root/.local/bin/opencode,"
-                "/root/.cache/opencode/bin/opencode"
+                f"{vyber_binary_search_summary()}"
             ),
         }
 
@@ -1188,7 +1192,7 @@ Begin with `vyber list`, then read every vulnerable file before writing EXPLOIT_
             yield (red_terminal, blue_terminal, f"Round {round_num} — Exploit report committed")
             time.sleep(1.0)
 
-            # ── BLUE AGENT: patch through Vyber/OpenCode harness ─────────
+            # ── BLUE AGENT: patch through Vyber harness ─────────────────
             blue_terminal += fmt_section(f"ROUND {round_num}  BLUE AGENT  VYBER HARNESS")
             blue_terminal += f"  [{ts()}] exploit intel received from red agent\n"
             blue_terminal += f"  [{ts()}] granting Vyber harness read/edit/shell access inside /tmp/sandbox\n"
