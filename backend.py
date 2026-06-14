@@ -326,15 +326,31 @@ def run_duel_stream(scenario_id: int, openai_api_key: str = None) -> Generator[t
     """
     base_dir = "/tmp/sandbox"
     
-    # 1. Initialize Scenario
-    yield ("", "", "Initializing sandbox target environment...")
-    CyberRangeScenarios.init_scenario(scenario_id, base_dir)
-    time.sleep(1.5)
-    
-    red_terminal = "SYSTEM: Target files deployed in /tmp/sandbox/\n"
-    blue_terminal = "SYSTEM: Active telemetry channels listening for anomalies...\n"
-    yield (red_terminal, blue_terminal, "Target environment initialized. Initiating Attack Reconnaissance...")
-    time.sleep(1.5)
+    import datetime
+    def ts():
+        return datetime.datetime.utcnow().strftime("%H:%M:%S")
+    def fmt_section(title):
+        bar = "─" * 44
+        return f"\n╔{bar}╗\n║  {title:<42}║\n╚{bar}╝\n"
+    def fmt_tool(cmd, output):
+        lines = output.strip().splitlines()
+        out_block = "\n".join(f"  │  {l}" for l in lines) if lines else "  │  (no output)"
+        return f"  ├─ $ {cmd}\n  │\n{out_block}\n  │\n"
+
+    red_terminal  = f"vyber-range v1.0  //  red-team agent shell\n"
+    red_terminal += f"{'─'*46}\n"
+    red_terminal += f"  [{ts()}] sandbox    : /tmp/sandbox/\n"
+    red_terminal += f"  [{ts()}] scenario   : {scenario_id}\n"
+    red_terminal += f"  [{ts()}] status     : target files deployed\n"
+
+    blue_terminal  = f"vyber-range v1.0  //  blue-team SOC shell\n"
+    blue_terminal += f"{'─'*46}\n"
+    blue_terminal += f"  [{ts()}] telemetry  : active\n"
+    blue_terminal += f"  [{ts()}] watchdog   : monitoring /tmp/sandbox/\n"
+    blue_terminal += f"  [{ts()}] status     : waiting for threat signal\n"
+
+    yield (red_terminal, blue_terminal, "Sandbox initialized — agents online")
+    time.sleep(1.0)
     
     # Check if we should use Simulated Agent mode (set to False for live AI execution)
     use_simulation = False
@@ -736,24 +752,24 @@ Once the vulnerability is fully patched and the system is secured, output "MITIG
                     
                 blue_terminal += f"Reasoning : {thought}\n"
                 blue_terminal += f"Tool Call : Vyber - {instruction}\n"
+                instruction = response.split("Instruction:")[1].strip()
+                blue_terminal += f"THINK : {thought}\n"
+                blue_terminal += f"EXEC  : Vyber - {instruction}\n"
                 yield (red_terminal, blue_terminal + "...Executing...", "Applying hardening rule...")
                 
-                # Execute real tool/chmod command inside container
                 out = vyber_run(instruction, base_dir)
-                blue_terminal += f"Status    : Hardening rule executed. Output: {out}\n"
+                blue_terminal += f"STDOUT: {out}\n"
                 blue_terminal += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                 yield (red_terminal, blue_terminal, "Hardening in progress...")
                 
                 blue_prompt += f"\n{response}\nOutput:\n{out}\nNext Action:"
                 time.sleep(1.0)
             elif "MITIGATION_COMPLETE" in response:
-                blue_terminal += f"Reasoning : {thought}\n"
-                blue_terminal += "Status    : Mitigation verified and completed.\n"
-                break
-            else:
+                blue_terminal += f"THINK : {thought}\n"
+                blue_terminal += "STATUS: Mitigation finalized.\n"
                 break
                 
-        blue_terminal += "Status    : Patch deployment finalized. Initiating validation verification scan.\n"
+        blue_terminal += "STATUS: Patch deployment finalized. Initiating validation verification scan.\n"
         yield (red_terminal, blue_terminal, "Mitigation complete. Initiating validation verification scan...")
         time.sleep(1.5)
         
@@ -763,7 +779,7 @@ Once the vulnerability is fully patched and the system is secured, output "MITIG
     # Re-run exploit check output for Red Team
     red_terminal += "\n[MITIGATION VERIFICATION]\n"
     red_terminal += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-    red_terminal += "Reasoning : Re-running original exploit scan to verify security boundary.\n"
+    red_terminal += "ACTION    : Re-running original exploit scan.\n"
     if scenario_id == 1:
         red_terminal += "Tool Call : Vyber CLI - Read app_config.json\n"
         out = vyber_run("Read app_config.json", base_dir)
