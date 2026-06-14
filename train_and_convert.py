@@ -53,8 +53,8 @@ def train_and_convert_gguf(hf_token: str, repo_id: str):
     # Format dataset for Qwen Chat
     def format_prompts(batch):
         formatted = []
-        for q, a in zip(batch["question"], batch["answers"]):
-            formatted.append(f"<|im_start|>system\nYou are Vyber, an expert cybersecurity AI assistant.<|im_end|>\n<|im_start|>user\n{q}<|im_end|>\n<|im_start|>assistant\n{a}<|im_end|>")
+        for u, a in zip(batch["user"], batch["assistant"]):
+            formatted.append(f"<|im_start|>system\nYou are Vyber, an expert cybersecurity AI assistant.<|im_end|>\n<|im_start|>user\n{u}<|im_end|>\n<|im_start|>assistant\n{a}<|im_end|>")
         return {"text": formatted}
 
     dataset = dataset.map(format_prompts, batched=True)
