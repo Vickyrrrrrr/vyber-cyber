@@ -93,30 +93,87 @@ html, body {
     color: #231f1d !important;
 }
 
-/* Terminals Styling - Classy dark terminal box on cream page for both light/dark wrapper states */
-.red-terminal textarea, .blue-terminal textarea,
-.red-terminal textarea:disabled, .blue-terminal textarea:disabled,
-.red-terminal textarea[readonly], .blue-terminal textarea[readonly],
-.dark .red-terminal textarea, .dark .blue-terminal textarea,
-.dark .red-terminal textarea:disabled, .dark .blue-terminal textarea:disabled,
-.dark .red-terminal textarea[readonly], .dark .blue-terminal textarea[readonly] {
-    background-color: #181615 !important;
-    border: 1px solid #e6dfd5 !important;
+/* ── RED TEAM TERMINAL — warm dark crimson tint ── */
+.red-terminal textarea,
+.red-terminal textarea:focus,
+.red-terminal textarea:disabled,
+.red-terminal textarea[readonly],
+.dark .red-terminal textarea,
+.dark .red-terminal textarea:focus,
+.dark .red-terminal textarea:disabled,
+.dark .red-terminal textarea[readonly] {
+    background-color: #1c1110 !important;
+    background: #1c1110 !important;
+    border: 1px solid #3d1c18 !important;
+    border-left: 3px solid #802f1a !important;
     border-radius: 4px !important;
-    color: #faf8f5 !important;
-    -webkit-text-fill-color: #faf8f5 !important;
+    color: #f5e6e0 !important;
+    -webkit-text-fill-color: #f5e6e0 !important;
     opacity: 1 !important;
-    font-family: 'JetBrains Mono', monospace !important;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace !important;
     font-size: 0.875rem !important;
-    line-height: 1.6 !important;
-    padding: 20px !important;
+    line-height: 1.7 !important;
+    padding: 20px 20px 20px 18px !important;
     resize: none !important;
-}
-
-.red-terminal textarea:focus, .blue-terminal textarea:focus {
-    border-color: #802f1a !important;
+    text-shadow: none !important;
     box-shadow: none !important;
+    caret-color: #f5e6e0 !important;
 }
+.red-terminal .wrap,
+.dark .red-terminal .wrap {
+    background-color: #1c1110 !important;
+    border-color: #3d1c18 !important;
+}
+.red-terminal label, .red-terminal .block-label,
+.dark .red-terminal label, .dark .red-terminal .block-label {
+    color: #a06050 !important;
+    -webkit-text-fill-color: #a06050 !important;
+    background: transparent !important;
+}
+.red-terminal textarea::-webkit-scrollbar { width: 5px; }
+.red-terminal textarea::-webkit-scrollbar-track { background: #1c1110; }
+.red-terminal textarea::-webkit-scrollbar-thumb { background: #5a2018; border-radius: 3px; }
+
+/* ── BLUE TEAM TERMINAL — cool dark navy tint ── */
+.blue-terminal textarea,
+.blue-terminal textarea:focus,
+.blue-terminal textarea:disabled,
+.blue-terminal textarea[readonly],
+.dark .blue-terminal textarea,
+.dark .blue-terminal textarea:focus,
+.dark .blue-terminal textarea:disabled,
+.dark .blue-terminal textarea[readonly] {
+    background-color: #0f1318 !important;
+    background: #0f1318 !important;
+    border: 1px solid #1a2a40 !important;
+    border-left: 3px solid #2a6496 !important;
+    border-radius: 4px !important;
+    color: #d8eaf8 !important;
+    -webkit-text-fill-color: #d8eaf8 !important;
+    opacity: 1 !important;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace !important;
+    font-size: 0.875rem !important;
+    line-height: 1.7 !important;
+    padding: 20px 20px 20px 18px !important;
+    resize: none !important;
+    text-shadow: none !important;
+    box-shadow: none !important;
+    caret-color: #d8eaf8 !important;
+}
+.blue-terminal .wrap,
+.dark .blue-terminal .wrap {
+    background-color: #0f1318 !important;
+    border-color: #1a2a40 !important;
+}
+.blue-terminal label, .blue-terminal .block-label,
+.dark .blue-terminal label, .dark .blue-terminal .block-label {
+    color: #5a8aaa !important;
+    -webkit-text-fill-color: #5a8aaa !important;
+    background: transparent !important;
+}
+.blue-terminal textarea::-webkit-scrollbar { width: 5px; }
+.blue-terminal textarea::-webkit-scrollbar-track { background: #0f1318; }
+.blue-terminal textarea::-webkit-scrollbar-thumb { background: #1e4a6e; border-radius: 3px; }
 
 /* Premium Minimalist Button - Rust background */
 .launch-button, button.primary {
