@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="560" viewBox="0 0 1100 560" role="img" aria-labelledby="title desc">
+  <title id="title">Vyber architecture</title>
+  <desc id="desc">A flow diagram showing the Gradio UI, demo replay, live GPU duel, Modal worker, model, sandbox files, Red Agent, Blue Agent, patching, and verdicts.</desc>
+  <defs>
+    <style>
+      .bg { fill: #faf8f5; }
+      .panel { fill: #fffaf3; stroke: #e6dfd5; stroke-width: 1.4; }
+      .node { fill: #ffffff; stroke: #d8cabc; stroke-width: 1.5; }
+      .primary { fill: #802f1a; stroke: #802f1a; }
+      .muted { fill: #f2ece4; stroke: #d8cabc; }
+      .terminal { fill: #111312; stroke: #802f1a; stroke-width: 1.5; }
+      .text { font: 600 17px Inter, Arial, sans-serif; fill: #231f1d; }
+      .small { font: 500 13px Inter, Arial, sans-serif; fill: #594c43; }
+      .white { font: 600 17px Inter, Arial, sans-serif; fill: #ffffff; }
+      .mono { font: 500 14px monospace; fill: #f7efe7; }
+      .line { stroke: #9f897a; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+      .line2 { stroke: #802f1a; stroke-width: 2.2; fill: none; marker-end: url(#arrow-red); }
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L9,3 L0,6 Z" fill="#9f897a" />
+    </marker>
+    <marker id="arrow-red" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L9,3 L0,6 Z" fill="#802f1a" />
+    </marker>
+  </defs>
+
+  <rect class="bg" width="1100" height="560" rx="18" />
+  <rect class="panel" x="30" y="30" width="1040" height="500" rx="16" />
+
+  <text x="70" y="76" class="text" font-size="24">Vyber self-healing cyber-range</text>
+  <text x="70" y="102" class="small">Red finds evidence. Blue patches files. Red replays the exploit to verify the fix.</text>
+
+  <rect class="primary" x="70" y="150" width="210" height="72" rx="8" />
+  <text x="175" y="181" text-anchor="middle" class="white">Gradio Space UI</text>
+  <text x="175" y="204" text-anchor="middle" class="white" font-size="13">demo + live controls</text>
+
+  <rect class="muted" x="365" y="128" width="170" height="58" rx="8" />
+  <text x="450" y="162" text-anchor="middle" class="text">Demo Replay</text>
+  <text x="450" y="181" text-anchor="middle" class="small">no GPU</text>
+
+  <rect class="node" x="365" y="220" width="170" height="58" rx="8" />
+  <text x="450" y="254" text-anchor="middle" class="text">Live GPU Duel</text>
+  <text x="450" y="273" text-anchor="middle" class="small">Modal-backed</text>
+
+  <rect class="node" x="620" y="220" width="190" height="58" rx="8" />
+  <text x="715" y="254" text-anchor="middle" class="text">Modal GPU Worker</text>
+  <text x="715" y="273" text-anchor="middle" class="small">sandbox runtime</text>
+
+  <rect class="node" x="865" y="152" width="165" height="56" rx="8" />
+  <text x="947" y="184" text-anchor="middle" class="text">llama.cpp GGUF</text>
+  <text x="947" y="203" text-anchor="middle" class="small">Vyber 7B model</text>
+
+  <rect class="node" x="865" y="252" width="165" height="56" rx="8" />
+  <text x="947" y="284" text-anchor="middle" class="text">Sandbox Files</text>
+  <text x="947" y="303" text-anchor="middle" class="small">/tmp/sandbox</text>
+
+  <rect class="terminal" x="70" y="350" width="210" height="78" rx="8" />
+  <text x="175" y="383" text-anchor="middle" class="mono">Red Agent</text>
+  <text x="175" y="407" text-anchor="middle" class="mono">exploit report</text>
+
+  <rect class="terminal" x="365" y="350" width="210" height="78" rx="8" />
+  <text x="470" y="383" text-anchor="middle" class="mono">Blue Agent</text>
+  <text x="470" y="407" text-anchor="middle" class="mono">Vyber harness patch</text>
+
+  <rect class="terminal" x="660" y="350" width="210" height="78" rx="8" />
+  <text x="765" y="383" text-anchor="middle" class="mono">Red Re-Attack</text>
+  <text x="765" y="407" text-anchor="middle" class="mono">same exploit path</text>
+
+  <rect class="muted" x="920" y="350" width="110" height="78" rx="8" />
+  <text x="975" y="382" text-anchor="middle" class="text">Verdict</text>
+  <text x="975" y="405" text-anchor="middle" class="small">secure or risk</text>
+
+  <path class="line" d="M280 186 C320 186, 320 157, 365 157" />
+  <path class="line2" d="M280 186 C320 186, 320 249, 365 249" />
+  <path class="line2" d="M535 249 L620 249" />
+  <path class="line" d="M810 238 C840 215, 835 180, 865 180" />
+  <path class="line" d="M810 260 C840 270, 835 280, 865 280" />
+  <path class="line2" d="M715 278 C715 318, 175 318, 175 350" />
+  <path class="line2" d="M280 389 L365 389" />
+  <path class="line2" d="M575 389 L660 389" />
+  <path class="line2" d="M870 389 L920 389" />
+
+  <text x="322" y="145" class="small">public path</text>
+  <text x="322" y="238" class="small">live path</text>
+  <text x="610" y="330" class="small">patch files, then verify</text>
+</svg>

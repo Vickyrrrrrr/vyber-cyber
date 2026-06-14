@@ -100,22 +100,9 @@ Each lab pack plants three vulnerable files and three independent exploit paths.
 
 ## Architecture
 
-```mermaid
-flowchart TD
-    A[Gradio Space UI] --> B{Mode}
-    B --> C[Demo Replay]
-    B --> D[Live GPU Duel]
-    D --> E[Modal GPU Worker]
-    E --> F[llama.cpp GGUF Model]
-    E --> G[Sandbox Lab Files]
-    F --> H[Red Agent Exploit Report]
-    H --> I[Blue Agent Vyber Harness]
-    I --> J[Patch Files In Sandbox]
-    J --> K[Red Re-Attack Verification]
-    K --> L{Exploit Blocked?}
-    L -- yes --> M[Secure Verdict]
-    L -- no --> N[Risk Verdict]
-```
+![Vyber architecture](assets/architecture.svg)
+
+The README uses a static SVG because the Hugging Face file viewer does not reliably render Mermaid diagrams.
 
 ## Repository Structure
 
