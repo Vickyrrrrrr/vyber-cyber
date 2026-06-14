@@ -222,13 +222,6 @@ Vyber is designed for the Hugging Face Build Small Hackathon constraints, bonus 
 | OpenAI Track / Codex | Project development uses OpenAI Codex, with commits and repo history showing implementation work |
 | Field Notes bonus | A project writeup can explain model training, agent design, safety boundaries, and lessons learned |
 
-Not currently claimed:
-
-- **Off the Grid:** live mode uses Modal and may use fallback APIs.
-- **Tiny Titan:** Vyber uses a 7B model, not a <=4B model.
-- **NVIDIA Nemotron Quest:** Vyber does not currently use a Nemotron model.
-- **OpenBMB Awards:** Vyber does not currently use an OpenBMB model.
-
 ## Sponsor-Fit Notes
 
 Vyber naturally demonstrates several sponsor technologies:
