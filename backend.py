@@ -639,6 +639,24 @@ def vyber_agent_run(task: str, workspace_dir: str, api_key: str = None, timeout:
     """
     env = os.environ.copy()
     env["PATH"] = "/root/.opencode/bin:/root/.local/bin:/root/.cache/opencode/bin:/usr/local/bin:" + env.get("PATH", "")
+    sandbox_glob = os.path.join(workspace_dir, "**")
+    env["OPENCODE_CONFIG_CONTENT"] = json.dumps({
+        "$schema": "https://opencode.ai/config.json",
+        "permission": {
+            "external_directory": {
+                sandbox_glob: "allow"
+            },
+            "read": "allow",
+            "edit": "allow",
+            "glob": "allow",
+            "grep": "allow",
+            "bash": "allow",
+            "webfetch": "deny",
+            "websearch": "deny",
+            "task": "deny",
+            "question": "deny"
+        }
+    })
     if api_key:
         env["OPENAI_API_KEY"] = api_key
 
@@ -659,7 +677,14 @@ def vyber_agent_run(task: str, workspace_dir: str, api_key: str = None, timeout:
 
     try:
         res = subprocess.run(
-            [binary, "run", task],
+            [
+                binary,
+                "run",
+                "--dir",
+                workspace_dir,
+                "--dangerously-skip-permissions",
+                task,
+            ],
             capture_output=True,
             text=True,
             cwd=workspace_dir,
