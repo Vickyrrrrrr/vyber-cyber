@@ -10,138 +10,291 @@ app_file: app.py
 pinned: false
 ---
 
-# Vyber: Autonomous Self-Healing Cyber-Range
+# Vyber
 
-**Vyber** is a fully autonomous, self-healing cyber-range prototype built for the Hugging Face **Build Small Hackathon**. It showcases how small, highly-optimized language models ($\le$ 1.5B parameters) can automate complex offensive and defensive cybersecurity workflows in real-time, isolated container sandboxes.
+**Vyber** is a two-agent cybersecurity range for the Hugging Face **Build Small Hackathon**. It uses a fine-tuned small model as a cyber expert that can inspect vulnerable server configuration files, identify security issues, generate patch plans, apply fixes in an isolated sandbox, and verify whether the system has been healed.
 
-Vyber stacks two merit badges for the Build Small Hackathon:
-* **Well-Tuned Badge**: Run custom instruction fine-tuning on a curated cybersecurity dataset, compile the result directly to GGUF, and deploy it.
-* **Llama Champion Badge**: Run local inference using the highly-optimized `llama.cpp` runtime compiled with CUDA GPU-offloading inside serverless Modal containers.
+The core idea is simple:
 
----
+1. The **Red Team Agent** finds the vulnerability.
+2. The **Blue Team Agent** patches the vulnerability.
+3. The validator checks whether the target is actually secure.
 
-## Architecture & Workflow
+Vyber is designed as a safe, defensive demo. The included app runs against controlled sandbox files, not real third-party infrastructure.
 
-Vyber operates as a closed-loop autonomous simulation (a "duel") inside isolated sandboxes. 
+## Model
+
+Vyber is powered by the published GGUF model:
+
+**[`vxkyyy/vyber-security-7b-gguf`](https://huggingface.co/vxkyyy/vyber-security-7b-gguf)**
+
+Model details:
+
+- Base model: `Qwen/Qwen2.5-7B-Instruct`
+- Fine-tuning method: PEFT / LoRA
+- Format: GGUF for `llama.cpp`
+- Runtime: `llama-cpp-python` inside Modal GPU containers
+- Primary role: cybersecurity instruction following, configuration auditing, vulnerability reasoning, and defensive patch generation
+- License: Apache 2.0
+
+The model is loaded in [backend.py](backend.py) through `llama.cpp` with GPU offloading. If the custom 7B model is unavailable, the backend attempts smaller or public fallback GGUF models.
+
+## What Vyber Does
+
+Vyber simulates an autonomous security response loop:
 
 ```mermaid
 graph TD
-    A[Start Cyber-Range Duel] --> B[Initialize Vulnerable Scenario File]
-    B --> C[Phase 1: Red Team Reconnaissance]
-    C --> D[Identify Flaw & Commit Exploit Plan]
-    D --> E[Phase 2: Blue Team Detection]
-    E --> F[SOC Analyst Auto-Remediation]
-    F --> G[Deploy Secure Code Patch / Hardening]
-    G --> H[Phase 3: Validation Verification Scan]
-    H --> I[Re-run Red Team Exploit Target]
-    I --> J{Exploit Blocked?}
-    J -- Yes --> K[Verification PASSED: Infrastructure Secure]
-    J -- No --> L[Verification FAILED: Compromised]
+    A[Choose Scenario] --> B[Create Isolated Sandbox]
+    B --> C[Plant Vulnerable Config Files]
+    C --> D[Red Team Agent Recon]
+    D --> E[Exploit Report]
+    E --> F[Blue Team Agent Patch]
+    F --> G[Validator Checks Files]
+    G --> H{All Vulnerabilities Fixed?}
+    H -- No --> D
+    H -- Yes --> I[System Secure]
 ```
 
-### 1. Offensive Agent (Red Team)
-Simulates an elite attacker performing automated reconnaissance and exploitation. It scans configurations, executes targeted shell queries inside the sandbox container, identifies the flaw, and outputs a structured JSON exploit strategy.
+The Gradio UI streams both agents into one continuous operation terminal:
 
-### 2. Defensive Agent (Blue Team)
-Acts as an autonomous, self-healing Security Operations Center (SOC) responder. It intercepts the Red Team's exploit strategy, retrieves the vulnerable configuration file, writes an updated and secure version, issues system hardening policies (like changing Unix permissions via `chmod` or reloading certificate authorities), and deploys the fix.
+- **Phase 01 / Red Team Discovery**: reconnaissance, target files, exploit report
+- **Phase 02 / Blue Team Remediation**: detection, remediation actions, patch output
+- **Status banner**: current phase and final verdict
 
-### 3. Automated Verification Loop
-Forces the Red Team agent to execute its recon and exploit tools a second time against the modified files. If the exploit is blocked, the defense patch is validated as successfully hardened, yielding a 100% healed system.
+The interface is intentionally terminal-first: calm typography, compact status, no decorative chat bubbles, and a chronological trace that reads like a real security operation.
 
----
+## Built-In Cyber-Range Scenarios
 
-## Hackathon Badge Integration
+| Scenario | Vulnerabilities Planted | Defensive Fix Expected |
+| --- | --- | --- |
+| Secret Leak | Hardcoded database password, API key, cloud keys, world-readable deploy script | Parameterize secrets, remove plaintext keys, restrict file permissions |
+| Exposed Database | Database bound to `0.0.0.0`, authentication disabled, weak TLS, open firewall | Bind to localhost, require auth, enforce TLS 1.2/1.3, restrict inbound ports |
+| MITM Pipeline | HTTP endpoint, SSL disabled, plaintext card data in logs, public admin API | Enforce HTTPS, verify certificates, require encryption, scrub PII, enable auth and rate limits |
+| DVWA-style SQL Injection | String-built login SQL, weak session cookies, leaked reset tokens | Parameterize queries, hash passwords, enable CSRF and secure cookies, scrub auth logs |
+| Juice Shop-style Broken Auth | Unsigned JWTs, permissive CORS, public admin API, payment debug leaks | Verify JWTs, use env-backed secrets, scope CORS, rate-limit APIs, remove payment telemetry |
+| WebGoat-style Deserialization | Unsafe pickle loading, unrestricted uploads, root worker permissions | Replace unsafe parser, validate schema, restrict upload policy, enforce least privilege |
 
-### 1. Well-Tuned Badge (Fine-Tuning & GGUF)
-* **Dataset**: Fine-tuned on the `Trendyol/Trendyol-Cybersecurity-Instruction-Tuning-Dataset` using `SFTTrainer` with parameter-efficient LoRA adapters (`PEFT`).
-* **Base Model**: `Qwen/Qwen2.5-1.5B-Instruct` (FP16 base weights).
-* **Merging**: Adapters merged directly into base weights to prevent downstream degradation.
-* **Quantization & Format**: Converted to GGUF using `llama.cpp`'s `convert_hf_to_gguf.py` utility.
-* **Publishing**: Automatically published to the Hugging Face Hub under: [vxkyyy/vyber-security-1.5b-gguf](https://huggingface.co/vxkyyy/vyber-security-1.5b-gguf).
+Each scenario contains three separate vulnerabilities. Vyber does not pass the run until all vulnerabilities in that scenario are fixed.
 
-### 2. Llama Champion Badge (Local llama.cpp + CUDA)
-* **Runtime**: Runs local GGUF inference directly inside serverless container environments via `llama-cpp-python` with CUDA acceleration.
-* **Compilation**: Compiled from source on A10G GPUs during image builder phase by symlinking CUDA stubs:
-  ```bash
-  ln -sf /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1
-  LD_LIBRARY_PATH=/usr/local/cuda/lib64/stubs:$LD_LIBRARY_PATH CMAKE_ARGS="-DGGML_CUDA=on" pip install llama-cpp-python
-  ```
-* **GPU Offloading**: Configured with `n_gpu_layers=-1` to fully offload the network layers to the GPU, minimizing inference latency down to milliseconds.
+## Repository Structure
 
----
+Public GitHub repository for the Codex prize track:
 
-## Project Repository Structure
+**[`Vickyrrrrrr/vyber-cyber`](https://github.com/Vickyrrrrrr/vyber-cyber)**
 
-* **[app.py](app.py)**: Gradio web dashboard featuring a dark mode developer console that streams logs from both terminals side-by-side.
-* **[backend.py](backend.py)**: Serverless backend definition for Modal. Orchestrates the file sandbox creation, validation check rules, simulation execution pipelines, and hosts the GPU-accelerated `ModelServer` class.
-* **[train_and_convert.py](train_and_convert.py)**: Fully automated serverless training pipeline script to fine-tune the 1.5B model, merge layers, build the GGUF, and upload the artifact to Hugging Face.
-* **[requirements.txt](requirements.txt)**: Requirements for the local web dashboard.
+```text
+.
+├── app.py              # Gradio dashboard and Modal function client
+├── backend.py          # Modal backend, model server, agent loop, sandbox validators
+├── requirements.txt    # Local Gradio app dependencies
+└── README.md           # Project documentation and Hugging Face Space card
+```
 
----
+The model training and conversion pipeline has already been completed. The trained model artifact is published on Hugging Face, so this live Space only contains the app and backend needed to run the cyber-range.
 
-## Target Scenarios
+## How The Backend Works
 
-| Scenario | Vulnerability Flaw | Defensive Mitigation Patch |
-| :--- | :--- | :--- |
-| **1. Secret Leak** | Plain-text database credentials and admin API keys in `app_config.json`. | Extract secrets to environment variables, rewrite config, restrict system permissions (`chmod 600`). |
-| **2. Exposed DB Port** | PostgreSQL database globally bound to interface `0.0.0.0` with auth disabled. | Bind binding interface to loopback localhost (`127.0.0.1`) and enforce strong authentication rules. |
-| **3. MITM Pipeline** | Unencrypted transit of billing JSON payloads over HTTP network endpoints. | Enforce HTTPS protocol upgrade, enable SSL verification, and restrict accepted ciphers to `AES-256-GCM`. |
+### 1. Scenario Initialization
 
----
+`CyberRangeScenarios.init_scenario(...)` creates vulnerable files under `/tmp/sandbox`, such as:
 
-## Quick Start
+- `app_config.json`
+- `server.env`
+- `deploy.sh`
+- `db_settings.yaml`
+- `nginx.conf`
+- `firewall_rules.json`
+- `pipeline_config.json`
+- `traffic_stream.log`
+- `api_gateway.json`
+- `login_handler.py`
+- `auth_routes.js`
+- `profile_importer.py`
+- lab-specific policy and audit files
 
-### 1. Prerequisites & Credentials
-Export your Hugging Face write token and username to authenticate training runs and upload outputs:
+### 2. Red Team Agent
+
+The Red Team Agent receives a list of unpatched vulnerabilities and is asked to inspect the sandbox. It produces an exploit report that summarizes the current risk.
+
+Example output shape:
+
+```text
+EXPLOIT_REPORT:
+S1-V1: app_config.json contains plaintext database and API secrets.
+S1-V2: server.env contains cloud and payment provider keys.
+S1-V3: deploy.sh is world-readable and includes a database password.
+```
+
+### 3. Blue Team Agent
+
+The Blue Team Agent receives the exploit report and rewrites vulnerable files with secure replacements. It can also issue hardening commands such as permission changes.
+
+Example remediation actions:
+
+- Replace hardcoded secrets with environment-variable references
+- Change database host from `0.0.0.0` to `127.0.0.1`
+- Enable authentication
+- Remove weak SSL protocols
+- Restrict public firewall rules
+- Scrub sensitive data from logs
+- Disable public admin endpoints
+
+### 4. Validation Loop
+
+After each round, the validator checks the actual file contents and permissions. The run continues for up to three rounds or until every vulnerability is patched.
+
+## Running Locally
+
+Install dependencies:
+
 ```bash
-export HF_TOKEN="your_huggingface_write_token"
-export HF_USERNAME="your_huggingface_username"
+pip install -r requirements.txt
 ```
 
-### 2. Run the Automated Fine-Tuning Pipeline
-To execute the serverless model training, merging, GGUF conversion, and automatic HF upload:
+Launch the Gradio app:
+
 ```bash
-modal run train_and_convert.py --repo-name vyber-security-1.5b-gguf
+python app.py
 ```
 
-### 3. Deploy the Serverless Backend
-To build the CUDA-enabled container image, compile `llama-cpp-python`, and deploy the serverless endpoints:
+Open:
+
+```text
+http://localhost:7860
+```
+
+The app first tries to call the deployed Modal backend:
+
+```python
+modal.Function.from_name("cyber-defense-range", "run_duel_stream")
+```
+
+If that lookup fails, it attempts local Modal execution.
+
+## Deploying The Backend
+
+Deploy the Modal backend:
+
 ```bash
 modal deploy backend.py
 ```
 
-### 4. Run the Web Dashboard Locally
-Install requirements and launch the Gradio user interface:
-```bash
-pip install -r requirements.txt
-python app.py
+The backend image installs:
+
+- CUDA base image
+- `llama-cpp-python` with CUDA support
+- `nmap`, `curl`, `git`, build tools
+- Python packages for Modal, Gradio, YAML, OpenAI fallback, and Hugging Face Hub
+
+The model server downloads the GGUF model from Hugging Face and runs it through `llama.cpp`.
+
+## Using Vyber On Your Own Server
+
+Vyber can be adapted for defensive audits of servers you own or are explicitly authorized to test. The default version intentionally runs only inside `/tmp/sandbox` so the hackathon demo is safe and reproducible.
+
+To connect it to a real server, use this pattern:
+
+### 1. Create a Target Profile
+
+Define the server details you want Vyber to inspect:
+
+```text
+TARGET_NAME=production-web-01
+TARGET_HOST=your.server.ip
+TARGET_PORT=22
+TARGET_USER=audit-user
 ```
-Open `http://localhost:7860` in your browser to run the simulations.
 
----
+Store credentials in Modal secrets, not in source code.
 
-## Customizing the Target Server Backend
+### 2. Replace The Command Runner
 
-Vyber is designed to be highly modular. By default, the offensive and defensive agents run inside a local container sandbox (`/tmp/sandbox`). However, you can easily adapt the system to target real remote servers:
+The current helper is:
 
-### 1. Pointing to your Custom Modal Backend
-If you deploy the backend under a different Modal application name:
-1. In `backend.py`, update the application initialization:
-   ```python
-   app = modal.App("your-custom-app-name")
-   ```
-2. In `app.py`, update the Gradio remote function lookup:
-   ```python
-   f = modal.Function.from_name("your-custom-app-name", "run_duel_stream")
-   ```
+```python
+def vyber_run(instruction: str, workspace_dir: str) -> str:
+```
 
-### 2. Targeting Real Remote Servers
-Instead of running commands locally inside the sandbox folder, you can direct the agents to execute actions on an external host:
-1. **Pass Credentials Securely**: Store SSH keys, host IPs, and ports in your Modal secrets or pass them through `openai_api_key` environment mappings.
-2. **Modify the Command Runner**: Update the `vyber_run` helper function inside `backend.py` to route shell commands through a secure channel (e.g., executing commands via `paramiko` or an SSH client connection to the remote target host) instead of running `subprocess.run(...)` locally.
-3. **Update Agent Prompts**: Modify the agent's target description prompts in the execution loop to point the LLM to the absolute file paths on your target server (e.g., `/etc/nginx/nginx.conf` or database config folders).
+For a real server, replace the local `subprocess.run(...)` path with a secure SSH runner using `paramiko` or the system `ssh` client.
 
----
+Recommended first commands for audit mode:
+
+```text
+cat /etc/nginx/nginx.conf
+cat /etc/postgresql/*/main/postgresql.conf
+cat /etc/postgresql/*/main/pg_hba.conf
+ls -la /var/www
+find /var/www -maxdepth 3 -name "*.env" -o -name "*.json" -o -name "*.yaml"
+```
+
+Start with read-only commands. Let Vyber generate a patch plan before enabling automatic writes.
+
+### 3. Add Server-Specific Validators
+
+For each server type, add validation rules similar to the existing scenario checks:
+
+- Web server: TLS version, ciphers, exposed admin routes
+- Database: bind address, auth mode, open ports
+- App config: hardcoded secrets, debug flags, permissive CORS
+- File permissions: world-readable secret files or deploy scripts
+- Logs: exposed tokens, payment data, credentials, or PII
+
+The validator is what makes Vyber more than a chatbot. It checks whether the system is actually safer after the patch.
+
+### 4. Run In Review Mode First
+
+For real infrastructure, the safest flow is:
+
+1. Read server files.
+2. Produce vulnerability report.
+3. Generate patch diff.
+4. Human reviews patch.
+5. Apply patch.
+6. Run validator again.
+
+Only enable fully automatic remediation after you trust the target profile and validators.
+
+## Safety Boundaries
+
+Use Vyber only on systems you own or have explicit permission to assess. The project is intended for:
+
+- Defensive security auditing
+- Developer education
+- Cyber-range simulation
+- Secure configuration repair
+- Patch validation workflows
+
+Do not use Vyber to scan, exploit, or modify third-party systems without authorization.
+
+## Hackathon Fit
+
+Vyber is built for the Build Small Hackathon constraints:
+
+- **Small model**: custom 7B cybersecurity model, under the 32B parameter limit
+- **Gradio app**: hosted as a Hugging Face Space
+- **Show, don't tell**: visual two-agent terminal trace
+
+Bonus badge alignment:
+
+- **Well-Tuned**: uses a fine-tuned model published on Hugging Face
+- **Llama Champion**: runs GGUF inference through `llama.cpp`
+- **Off-Brand**: custom Gradio styling instead of default UI
+- **Sharing is Caring**: agent traces can be exported or shared for learning
+- **Field Notes**: project writeup can explain the design, training, and validation loop
+
+## Environment Variables
+
+Optional:
+
+```bash
+export OPENAI_API_KEY="..."
+```
+
+The OpenAI key is only used as a fallback if local GGUF model loading fails.
+
+For real-server adaptation, store SSH credentials and target config as Modal secrets rather than local `.env` files.
 
 ## License
-Distributed under the MIT License. See `LICENSE` for more information.
+
+Distributed under the MIT License.

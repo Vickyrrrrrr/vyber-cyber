@@ -134,6 +134,46 @@ html, body {
 .red-terminal textarea::-webkit-scrollbar-track { background: #1c1110; }
 .red-terminal textarea::-webkit-scrollbar-thumb { background: #5a2018; border-radius: 3px; }
 
+.operation-terminal textarea,
+.operation-terminal textarea:focus,
+.operation-terminal textarea:disabled,
+.operation-terminal textarea[readonly],
+.dark .operation-terminal textarea,
+.dark .operation-terminal textarea:focus,
+.dark .operation-terminal textarea:disabled,
+.dark .operation-terminal textarea[readonly] {
+    background-color: #0d0f10 !important;
+    background: #0d0f10 !important;
+    border: 1px solid #28231f !important;
+    border-left: 3px solid #802f1a !important;
+    border-radius: 4px !important;
+    color: #eee7dc !important;
+    -webkit-text-fill-color: #eee7dc !important;
+    opacity: 1 !important;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace !important;
+    font-size: 0.86rem !important;
+    line-height: 1.62 !important;
+    padding: 22px 24px !important;
+    resize: none !important;
+    text-shadow: none !important;
+    box-shadow: none !important;
+    caret-color: #eee7dc !important;
+}
+.operation-terminal .wrap,
+.dark .operation-terminal .wrap {
+    background-color: #0d0f10 !important;
+    border-color: #28231f !important;
+}
+.operation-terminal label, .operation-terminal .block-label,
+.dark .operation-terminal label, .dark .operation-terminal .block-label {
+    color: #8c7667 !important;
+    -webkit-text-fill-color: #8c7667 !important;
+    background: transparent !important;
+}
+.operation-terminal textarea::-webkit-scrollbar { width: 6px; }
+.operation-terminal textarea::-webkit-scrollbar-track { background: #0d0f10; }
+.operation-terminal textarea::-webkit-scrollbar-thumb { background: #4d3328; border-radius: 3px; }
+
 /* ── BLUE TEAM TERMINAL — cool dark navy tint ── */
 .blue-terminal textarea,
 .blue-terminal textarea:focus,
@@ -208,6 +248,23 @@ html, body {
     color: #802f1a !important;
 }
 
+.lab-note {
+    background-color: #f7f2eb !important;
+    border: 1px solid #e6dfd5 !important;
+    border-radius: 4px !important;
+    padding: 12px 16px !important;
+    margin: 4px 0 16px 0 !important;
+    color: #594c43 !important;
+    font-family: 'Inter', sans-serif !important;
+    font-size: 0.88rem !important;
+    line-height: 1.55 !important;
+}
+
+.lab-note strong {
+    color: #802f1a !important;
+    font-weight: 600 !important;
+}
+
 /* Labels and Markdown titles */
 h3 {
     font-family: 'Playfair Display', serif !important;
@@ -225,17 +282,82 @@ h3 {
 }
 """
 
-def launch_duel(scenario_name):
-    # Mapping friendly name to scenario ID
-    scenario_map = {
-        "Scenario 1: Insecure Configuration File (Secret Leak)": 1,
-        "Scenario 2: Exposed Database Port (Global Binding)": 2,
-        "Scenario 3: Unencrypted Communication Pipeline (MITM)": 3
+SCENARIO_CHOICES = [
+    "Scenario 1: Insecure Configuration File (Secret Leak)",
+    "Scenario 2: Exposed Database Port (Global Binding)",
+    "Scenario 3: Unencrypted Communication Pipeline (MITM)",
+    "Lab Pack 4: DVWA-style SQL Injection & Weak Sessions",
+    "Lab Pack 5: Juice Shop-style Broken Auth & API Policy",
+    "Lab Pack 6: WebGoat-style Deserialization & Upload Risk"
+]
+
+SCENARIO_MAP = {
+    "Scenario 1: Insecure Configuration File (Secret Leak)": 1,
+    "Scenario 2: Exposed Database Port (Global Binding)": 2,
+    "Scenario 3: Unencrypted Communication Pipeline (MITM)": 3,
+    "Lab Pack 4: DVWA-style SQL Injection & Weak Sessions": 4,
+    "Lab Pack 5: Juice Shop-style Broken Auth & API Policy": 5,
+    "Lab Pack 6: WebGoat-style Deserialization & Upload Risk": 6
+}
+
+def clean_console(text):
+    replacements = {
+        "✓": "PASS",
+        "✗": "FAIL",
+        "▶": "...",
+        "—": "-",
+        "–": "-",
     }
-    scenario_id = scenario_map.get(scenario_name, 1)
+    for old, new in replacements.items():
+        text = text.replace(old, new)
+    return text
+
+def format_operation_trace(red_out, blue_out):
+    red = clean_console(red_out or "").strip()
+    blue = clean_console(blue_out or "").strip()
+
+    lines = [
+        "VYBER OPERATION TRACE",
+        "mode        : autonomous cyber-range",
+        "model       : vxkyyy/vyber-security-7b-gguf",
+        "backend     : Hugging Face Space UI -> Modal GPU worker",
+        "workspace   : /tmp/sandbox",
+        "",
+        "PHASE 01 / RED TEAM DISCOVERY",
+        "------------------------------------------------------------",
+    ]
+
+    if red:
+        lines.append(red)
+    else:
+        lines.append("waiting for target initialization")
+
+    blue_ready = any(marker in (red_out or "") for marker in [
+        "EXPLOIT REPORT COMMITTED",
+        "SCOREBOARD",
+        "FINAL VERDICT"
+    ]) or any(marker in (blue_out or "") for marker in [
+        "BLUE AGENT",
+        "PATCH_COMPLETE",
+        "ACTION",
+        "FINAL VERDICT"
+    ])
+
+    if blue_ready and blue:
+        lines.extend([
+            "",
+            "PHASE 02 / BLUE TEAM REMEDIATION",
+            "------------------------------------------------------------",
+            blue,
+        ])
+
+    return "\n".join(lines)
+
+def launch_duel(scenario_name):
+    scenario_id = SCENARIO_MAP.get(scenario_name, 1)
     
     # Immediately notify the user of real state
-    yield "", "", "Status: Connecting to serverless GPU backend (Provisioning node & loading weights)..."
+    yield format_operation_trace("", ""), "Status: Connecting to serverless GPU backend (provisioning node and loading weights)..."
     
     # Connect securely to active Modal application
     openai_api_key = os.environ.get("OPENAI_API_KEY", "")
@@ -244,7 +366,7 @@ def launch_duel(scenario_name):
         f = modal.Function.from_name("cyber-defense-range", "run_duel_stream")
         # Call generator to stream outputs character-by-character
         for red_out, blue_out, banner_txt in f.remote_gen(scenario_id, openai_api_key=openai_api_key):
-            yield red_out, blue_out, f"Status: {banner_txt}"
+            yield format_operation_trace(red_out, blue_out), f"Status: {clean_console(banner_txt)}"
     except Exception as e:
         print(f"Modal Remote Gen lookup failed: {e}. Falling back to local execution.")
         # Fallback to local import if Modal client is not fully authenticated/connected
@@ -253,10 +375,10 @@ def launch_duel(scenario_name):
             from backend import run_duel_stream
             # Execute generator locally (directly calls the function logic)
             for red_out, blue_out, banner_txt in run_duel_stream.local(scenario_id, openai_api_key=openai_api_key):
-                yield red_out, blue_out, f"Status: {banner_txt}"
+                yield format_operation_trace(red_out, blue_out), f"Status: {clean_console(banner_txt)}"
         except Exception as local_err:
             error_msg = f"Red Team Agent connection error:\n{str(e)}\nLocal Fallback error:\n{str(local_err)}"
-            yield error_msg, "Blue Team SOC connection offline.", "Status: Connection Error"
+            yield clean_console(error_msg), "Status: Connection Error"
 
 # Build Gradio UI
 with gr.Blocks(theme=gr.themes.Default(primary_hue="zinc", secondary_hue="zinc"), css=css) as demo:
@@ -272,7 +394,7 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="zinc", secondary_hue="zinc")
         "will the defense agent patch the vulnerability before the attack succeeds?"
         "</p>"
         "<p style='color: #594c43; font-family: \"Inter\", sans-serif; font-size: 1rem; max-width: 800px; margin: 0 auto; line-height: 1.6; font-weight: 400;'>"
-        "A serverless cyber-range where a custom fine-tuned 1.5B model acts as both offensive attacker and defensive responder. "
+        "A serverless cyber-range where a custom fine-tuned 7B cybersecurity model acts as both offensive attacker and defensive responder. "
         "Running on the <strong>llama.cpp</strong> runtime with local CUDA acceleration.<br/>"
         "<span style='color: #802f1a; font-size: 0.85rem; font-weight: 500;'>Note: Initial execution requires 3-4 minutes to compile CUDA wheels, spin up hardware, and load GGUF weights.</span>"
         "</p>"
@@ -281,43 +403,36 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="zinc", secondary_hue="zinc")
     
     with gr.Row():
         scenario_dropdown = gr.Dropdown(
-            choices=[
-                "Scenario 1: Insecure Configuration File (Secret Leak)",
-                "Scenario 2: Exposed Database Port (Global Binding)",
-                "Scenario 3: Unencrypted Communication Pipeline (MITM)"
-            ],
+            choices=SCENARIO_CHOICES,
             value="Scenario 1: Insecure Configuration File (Secret Leak)",
-            label="Target Cyber-Range Scenario"
+            label="Target Cyber-Range Scenario",
+            elem_classes=["scenario-selector"]
         )
         launch_btn = gr.Button("Launch Simulation Duel", variant="primary", elem_classes=["launch-button"])
+
+    gr.HTML(
+        "<div class='lab-note'>"
+        "<strong>Curated lab packs:</strong> choose the original Vyber config range or OWASP-inspired vulnerable app patterns. "
+        "Every run is generated inside an isolated sandbox, streamed live, patched by the Blue Agent, and verified by deterministic validators."
+        "</div>"
+    )
         
     status_banner = gr.Markdown("Status: Active sandbox waiting for execution command", elem_id="status-banner")
     
-    with gr.Row():
-        with gr.Column(scale=1):
-            gr.Markdown("### Red Team Agent Logs")
-            red_terminal = gr.Textbox(
-                label="Attack Shell Logs",
-                lines=22,
-                max_lines=30,
-                autoscroll=True,
-                elem_classes=["red-terminal"]
-            )
-        with gr.Column(scale=1):
-            gr.Markdown("### Blue Team Agent Logs")
-            blue_terminal = gr.Textbox(
-                label="Defense SOC Logs",
-                lines=22,
-                max_lines=30,
-                autoscroll=True,
-                elem_classes=["blue-terminal"]
-            )
+    gr.Markdown("### Operation Terminal")
+    operation_terminal = gr.Textbox(
+        label="Autonomous Red-to-Blue Security Trace",
+        lines=34,
+        max_lines=42,
+        autoscroll=True,
+        elem_classes=["operation-terminal"]
+    )
             
     # Connect trigger to generator
     launch_btn.click(
         fn=launch_duel,
         inputs=scenario_dropdown,
-        outputs=[red_terminal, blue_terminal, status_banner]
+        outputs=[operation_terminal, status_banner]
     )
 
 if __name__ == "__main__":

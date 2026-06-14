@@ -3,6 +3,7 @@ import time
 import json
 import yaml
 import subprocess
+import shlex
 from typing import Generator
 import modal
 
@@ -95,6 +96,76 @@ class CyberRangeScenarios:
                     "rate_limit_rpm": 0,
                     "cors_allow_all": True,
                     "admin_endpoint_public": True
+                }, f, indent=4)
+
+        elif scenario_id == 4:
+            # LAB: DVWA-style SQL injection + weak session controls
+            with open(os.path.join(base_dir, "login_handler.py"), "w") as f:
+                f.write("import sqlite3\n\n")
+                f.write("def login(username, password):\n")
+                f.write("    conn = sqlite3.connect('app.db')\n")
+                f.write("    query = f\"SELECT * FROM users WHERE username = '{username}' AND password = '{password}'\"\n")
+                f.write("    return conn.execute(query).fetchone()\n")
+
+            with open(os.path.join(base_dir, "session_config.json"), "w") as f:
+                json.dump({
+                    "session_secret": "dev-secret-123",
+                    "cookie_secure": False,
+                    "cookie_http_only": False,
+                    "csrf_protection": False,
+                    "same_site": "None"
+                }, f, indent=4)
+
+            with open(os.path.join(base_dir, "access_audit.log"), "w") as f:
+                f.write("[AUTH] failed login username=admin password=' OR '1'='1\n")
+                f.write("[AUTH] reset token=reset_live_123456 user=admin\n")
+
+        elif scenario_id == 5:
+            # LAB: Juice Shop-style broken auth + permissive API gateway
+            with open(os.path.join(base_dir, "auth_routes.js"), "w") as f:
+                f.write("const jwt = require('jsonwebtoken');\n")
+                f.write("const JWT_SECRET = 'keyboard-cat';\n\n")
+                f.write("function issueToken(user) {\n")
+                f.write("  return jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { algorithm: 'none' });\n")
+                f.write("}\n\n")
+                f.write("function requireAdmin(req, res, next) {\n")
+                f.write("  const decoded = jwt.decode(req.headers.authorization);\n")
+                f.write("  if (decoded.role === 'admin') return next();\n")
+                f.write("  return res.status(403).send('denied');\n")
+                f.write("}\n")
+
+            with open(os.path.join(base_dir, "api_policy.json"), "w") as f:
+                json.dump({
+                    "cors_origins": ["*"],
+                    "rate_limit_rpm": 0,
+                    "require_auth": False,
+                    "admin_routes_public": True
+                }, f, indent=4)
+
+            with open(os.path.join(base_dir, "payment_debug.log"), "w") as f:
+                f.write("[DEBUG] card=4111111111111111 cvv=123 jwt=eyJhbGciOiJub25lIn0\n")
+
+        elif scenario_id == 6:
+            # LAB: WebGoat-style unsafe deserialization + weak upload policy
+            with open(os.path.join(base_dir, "profile_importer.py"), "w") as f:
+                f.write("import pickle\n\n")
+                f.write("def import_profile(raw_bytes):\n")
+                f.write("    profile = pickle.loads(raw_bytes)\n")
+                f.write("    return profile\n")
+
+            with open(os.path.join(base_dir, "upload_policy.yaml"), "w") as f:
+                yaml.safe_dump({
+                    "allow_extensions": ["*"],
+                    "max_size_mb": 100,
+                    "scan_uploads": False,
+                    "store_outside_webroot": False
+                }, f, default_flow_style=False)
+
+            with open(os.path.join(base_dir, "worker_permissions.json"), "w") as f:
+                json.dump({
+                    "worker_user": "root",
+                    "can_spawn_shell": True,
+                    "network_egress": "0.0.0.0/0"
                 }, f, indent=4)
 
         else:
@@ -215,6 +286,124 @@ class CyberRangeScenarios:
                 fixed, detail = False, str(e)
             vulns.append({"id": "S3-V3", "file": "api_gateway.json", "cwe": "CWE-306",
                           "description": "API gateway: no auth, no rate limit, public admin endpoint", "fixed": fixed, "detail": detail})
+
+        elif scenario_id == 4:
+            # Vuln 1 — SQL injection in login handler
+            try:
+                content = open(os.path.join(base_dir, "login_handler.py")).read()
+                unsafe = any(token in content for token in ["f\"SELECT", "f'SELECT", ".format(", "% username", "% password"])
+                parameterized = "execute(" in content and any(token in content for token in ["?", "%s", ":username"])
+                fixed = parameterized and not unsafe and "password_hash" in content
+                detail = "parameterized query + password hash comparison" if fixed else "CWE-89: string-built SQL login query"
+            except Exception as e:
+                fixed, detail = False, str(e)
+            vulns.append({"id": "S4-V1", "file": "login_handler.py", "cwe": "CWE-89",
+                          "description": "DVWA-style SQL injection in login flow", "fixed": fixed, "detail": detail})
+
+            # Vuln 2 — weak session and CSRF controls
+            try:
+                with open(os.path.join(base_dir, "session_config.json")) as f:
+                    d = json.load(f)
+                fixed = d.get("cookie_secure") is True and \
+                        d.get("cookie_http_only") is True and \
+                        d.get("csrf_protection") is True and \
+                        d.get("same_site") in ["Strict", "Lax"] and \
+                        "dev-secret-123" not in d.get("session_secret", "")
+                detail = "secure cookies + CSRF enabled" if fixed else "CWE-352/CWE-614: weak session cookie and CSRF policy"
+            except Exception as e:
+                fixed, detail = False, str(e)
+            vulns.append({"id": "S4-V2", "file": "session_config.json", "cwe": "CWE-352",
+                          "description": "Weak session cookie flags and CSRF disabled", "fixed": fixed, "detail": detail})
+
+            # Vuln 3 — sensitive auth data in logs
+            try:
+                content = open(os.path.join(base_dir, "access_audit.log")).read().lower()
+                fixed = "password=" not in content and "reset_live_" not in content and "' or '1'='1" not in content
+                detail = "auth log scrubbed" if fixed else "CWE-532: passwords and reset token leaked in auth logs"
+            except Exception as e:
+                fixed, detail = False, str(e)
+            vulns.append({"id": "S4-V3", "file": "access_audit.log", "cwe": "CWE-532",
+                          "description": "Credentials and reset token leaked in access logs", "fixed": fixed, "detail": detail})
+
+        elif scenario_id == 5:
+            # Vuln 1 — broken JWT verification
+            try:
+                content = open(os.path.join(base_dir, "auth_routes.js")).read()
+                fixed = "keyboard-cat" not in content and \
+                        "algorithm: 'none'" not in content and \
+                        "jwt.decode" not in content and \
+                        "jwt.verify" in content and \
+                        "process.env.JWT_SECRET" in content
+                detail = "JWT verified with env-backed secret" if fixed else "CWE-347: unsigned/decoded JWT trust"
+            except Exception as e:
+                fixed, detail = False, str(e)
+            vulns.append({"id": "S5-V1", "file": "auth_routes.js", "cwe": "CWE-347",
+                          "description": "Juice Shop-style broken JWT verification", "fixed": fixed, "detail": detail})
+
+            # Vuln 2 — permissive API policy
+            try:
+                with open(os.path.join(base_dir, "api_policy.json")) as f:
+                    d = json.load(f)
+                fixed = "*" not in d.get("cors_origins", []) and \
+                        d.get("rate_limit_rpm", 0) > 0 and \
+                        d.get("require_auth") is True and \
+                        d.get("admin_routes_public") is False
+                detail = "auth, rate limit, and scoped CORS enforced" if fixed else "CWE-942/CWE-306: public API policy"
+            except Exception as e:
+                fixed, detail = False, str(e)
+            vulns.append({"id": "S5-V2", "file": "api_policy.json", "cwe": "CWE-942",
+                          "description": "Permissive CORS, no rate limit, public admin API", "fixed": fixed, "detail": detail})
+
+            # Vuln 3 — payment data in debug log
+            try:
+                content = open(os.path.join(base_dir, "payment_debug.log")).read().lower()
+                fixed = "4111111111111111" not in content and "cvv" not in content and "eyj" not in content
+                detail = "payment telemetry scrubbed" if fixed else "CWE-532: card data and token leaked in log"
+            except Exception as e:
+                fixed, detail = False, str(e)
+            vulns.append({"id": "S5-V3", "file": "payment_debug.log", "cwe": "CWE-532",
+                          "description": "Card data and JWT leaked in debug log", "fixed": fixed, "detail": detail})
+
+        elif scenario_id == 6:
+            # Vuln 1 — unsafe pickle deserialization
+            try:
+                content = open(os.path.join(base_dir, "profile_importer.py")).read()
+                fixed = "pickle.loads" not in content and \
+                        "json.loads" in content and \
+                        "validate_profile" in content
+                detail = "JSON parser + schema validation" if fixed else "CWE-502: unsafe pickle deserialization"
+            except Exception as e:
+                fixed, detail = False, str(e)
+            vulns.append({"id": "S6-V1", "file": "profile_importer.py", "cwe": "CWE-502",
+                          "description": "WebGoat-style unsafe object deserialization", "fixed": fixed, "detail": detail})
+
+            # Vuln 2 — unsafe upload policy
+            try:
+                with open(os.path.join(base_dir, "upload_policy.yaml")) as f:
+                    d = yaml.safe_load(f)
+                extensions = d.get("allow_extensions", [])
+                fixed = "*" not in extensions and \
+                        d.get("scan_uploads") is True and \
+                        d.get("store_outside_webroot") is True and \
+                        d.get("max_size_mb", 100) <= 10
+                detail = "uploads restricted and scanned" if fixed else "CWE-434: unrestricted file upload policy"
+            except Exception as e:
+                fixed, detail = False, str(e)
+            vulns.append({"id": "S6-V2", "file": "upload_policy.yaml", "cwe": "CWE-434",
+                          "description": "Unrestricted upload extension and storage policy", "fixed": fixed, "detail": detail})
+
+            # Vuln 3 — overprivileged worker
+            try:
+                with open(os.path.join(base_dir, "worker_permissions.json")) as f:
+                    d = json.load(f)
+                fixed = d.get("worker_user") not in ["root", "admin"] and \
+                        d.get("can_spawn_shell") is False and \
+                        d.get("network_egress") not in ["0.0.0.0/0", "*"]
+                detail = "least privilege worker policy" if fixed else "CWE-250: worker runs with excessive privileges"
+            except Exception as e:
+                fixed, detail = False, str(e)
+            vulns.append({"id": "S6-V3", "file": "worker_permissions.json", "cwe": "CWE-250",
+                          "description": "Background worker has root shell and unrestricted egress", "fixed": fixed, "detail": detail})
 
         return vulns
 
@@ -348,36 +537,73 @@ def vyber_run(instruction: str, workspace_dir: str) -> str:
     except Exception:
         pass
     
-    # Fallback simulation logic for Vyber CLI commands
+    # Fallback simulation logic for Vyber CLI commands. Keep this intentionally
+    # narrow: agents can inspect sandbox files and apply simple hardening, but
+    # they do not receive an unrestricted shell when the CLI is unavailable.
     instruction_lower = instruction.lower().strip()
-    
-    # Check if the instruction starts with or contains direct shell commands
-    if any(cmd_name in instruction_lower for cmd_name in ["chmod", "iptables", "mkdir", "touch", "rm", "cp", "mv", "grep", "echo"]):
-        cmd = instruction
-    elif "list" in instruction_lower or "ls" in instruction_lower:
-        cmd = "ls -la"
+
+    def sandbox_files() -> list[str]:
+        try:
+            return sorted(
+                name for name in os.listdir(workspace_dir)
+                if os.path.isfile(os.path.join(workspace_dir, name))
+            )
+        except Exception:
+            return []
+
+    def mentioned_file() -> str | None:
+        for name in sandbox_files():
+            if name.lower() in instruction_lower:
+                return name
+        return None
+
+    if "list" in instruction_lower or instruction_lower in ["ls", "ls -la", "dir"]:
+        cmd = ["ls", "-la"]
     elif "inspect" in instruction_lower or "cat" in instruction_lower or "read" in instruction_lower:
-        if "app_config" in instruction_lower:
-            cmd = "cat app_config.json"
-        elif "db_settings" in instruction_lower:
-            cmd = "cat db_settings.yaml"
-        elif "pipeline_config" in instruction_lower:
-            cmd = "cat pipeline_config.json"
-        elif "traffic_stream" in instruction_lower:
-            cmd = "cat traffic_stream.log"
+        target = mentioned_file()
+        if target:
+            cmd = ["cat", target]
         else:
-            cmd = "ls -la"
+            cmd = ["ls", "-la"]
     elif "nmap" in instruction_lower:
-        cmd = "nmap localhost"
-    else:
-        # Default fallback to executing the instruction if it looks like a bash command, otherwise ls -la
-        if len(instruction.split()) <= 4 and not any(x in instruction_lower for x in ["help", "please", "could", "you"]):
-            cmd = instruction
+        cmd = ["nmap", "localhost"]
+    elif instruction_lower.startswith("chmod "):
+        parts = shlex.split(instruction)
+        mode = parts[1] if len(parts) >= 2 else "600"
+        target = mentioned_file() or (parts[-1] if len(parts) >= 3 else "")
+        if target and os.path.basename(target) in sandbox_files():
+            cmd = ["chmod", mode, os.path.basename(target)]
         else:
-            cmd = "ls -la"
-        
-    res = subprocess.run(cmd, shell=True, capture_output=True, text=True, cwd=workspace_dir)
-    return f"[Vyber Agent SDK Fallback] Executing: {cmd}\n{res.stdout}\n{res.stderr}"
+            cmd = ["ls", "-la"]
+    else:
+        target = mentioned_file()
+        cmd = ["cat", target] if target else ["ls", "-la"]
+
+    res = subprocess.run(cmd, capture_output=True, text=True, cwd=workspace_dir)
+    return f"[Vyber Agent SDK Fallback] Executing: {' '.join(cmd)}\n{res.stdout}\n{res.stderr}"
+
+def remediation_hint(vuln_id: str) -> str:
+    hints = {
+        "S1-V1": "replace plaintext database_url and api_key with environment-variable references; disable debug",
+        "S1-V2": "remove live cloud/payment keys and replace them with secret-manager or environment placeholders",
+        "S1-V3": "remove embedded DB password from deploy.sh and chmod the script to 600, 640, or 700",
+        "S2-V1": "bind database host to 127.0.0.1 or localhost and set auth_required=true",
+        "S2-V2": "remove SSLv2/SSLv3/TLSv1 and enforce TLSv1.2/TLSv1.3 with strong ciphers",
+        "S2-V3": "replace 0-65535 from 0.0.0.0/0 allow rules with least-privilege inbound rules",
+        "S3-V1": "upgrade endpoint to https, enable ssl and certificate verification, and set a real cipher",
+        "S3-V2": "scrub credit card values and CVV from logs while preserving non-sensitive telemetry",
+        "S3-V3": "enable auth, set a positive rate limit, and make admin_endpoint_public=false",
+        "S4-V1": "rewrite login_handler.py with parameterized SQL and password_hash comparison; remove f-string SQL",
+        "S4-V2": "rotate dev session secret, set secure/httpOnly cookies, enable CSRF, and use SameSite Strict or Lax",
+        "S4-V3": "remove password, SQL injection payload, and reset_live token values from the auth log",
+        "S5-V1": "use process.env.JWT_SECRET, jwt.verify, and a real signing algorithm; remove algorithm none and jwt.decode trust",
+        "S5-V2": "scope CORS origins, require auth, set rate_limit_rpm > 0, and make admin routes private",
+        "S5-V3": "remove card number, CVV, and JWT-like token values from payment debug logs",
+        "S6-V1": "replace pickle.loads with json.loads plus validate_profile schema checks",
+        "S6-V2": "remove wildcard upload extensions, enable scanning, store outside webroot, and cap size at 10MB or less",
+        "S6-V3": "run worker as non-root, disallow shell spawning, and restrict network egress",
+    }
+    return hints.get(vuln_id, "apply the least-privilege secure configuration required by the validator")
 
 # Stateful Execution Duel function
 @app.function(image=image)
@@ -688,9 +914,9 @@ def run_duel_stream(scenario_id: int, openai_api_key: str = None) -> Generator[t
             time.sleep(0.5)
 
             vuln_list_txt = "\n".join(
-                f"  {v['id']} | {v['cwe']} | {v['file']} | {v['description']}" for v in remaining
+                f"  {v['id']} | {v['cwe']} | {v['file']} | {v['description']} | current: {v['detail']} | fix: {remediation_hint(v['id'])}" for v in remaining
             )
-            red_prompt = f"""You are an autonomous Red Team agent. Operate inside /tmp/sandbox/. Be concise and technical. No prose.
+            red_prompt = f"""You are Vyber Red, an autonomous security analyst running inside a controlled cyber-range. Operate only inside /tmp/sandbox/. Be concise, evidence-led, and defensive. No markdown fences.
 
 UNPATCHED VULNERABILITIES ({len(remaining)} remaining):
 {vuln_list_txt}
@@ -699,17 +925,22 @@ TOOLS:
   vyber list          — list directory
   vyber read <file>   — read file content
 
-OUTPUT FORMAT (one action per response):
+ACTION FORMAT (one action per response):
 THINK: <one-line reasoning>
 EXEC: vyber <instruction>
 
-After reading each vulnerable file, commit ALL findings as:
+FINAL REPORT FORMAT (after enough evidence):
 EXPLOIT_REPORT:
-<vuln_id>: <one-line exploit vector>
-<vuln_id>: <one-line exploit vector>
+FINDING <vuln_id>
+FILE: <filename>
+CWE: <cwe>
+SEVERITY: <Critical|High|Medium|Low>
+EVIDENCE: <exact vulnerable pattern observed>
+ATTACK_PATH: <one-line realistic exploit path>
+IMPACT: <one-line business/security impact>
 ...
 
-Begin. List the directory first."""
+Begin with `vyber list`, then read every vulnerable file before writing EXPLOIT_REPORT."""
 
             exploit_report = ""
             for turn in range(len(remaining) + 2):
@@ -751,7 +982,7 @@ Begin. List the directory first."""
             yield (red_terminal, blue_terminal, f"Round {round_num} — Blue Agent patching...")
             time.sleep(0.5)
 
-            blue_prompt = f"""You are an autonomous Blue Team self-healing agent. Operate inside /tmp/sandbox/. Be concise and technical. No prose.
+            blue_prompt = f"""You are Vyber Blue, an autonomous self-healing security engineer running inside a controlled cyber-range. Operate only inside /tmp/sandbox/. Be concise, evidence-led, and defensive. No markdown fences.
 
 THREAT INTEL (red team exploit report):
 {exploit_report}
@@ -759,18 +990,27 @@ THREAT INTEL (red team exploit report):
 UNPATCHED VULNERABILITIES ({len(remaining)}):
 {vuln_list_txt}
 
+PATCH STANDARD:
+  - Preserve the app's intended behavior while removing the vulnerable pattern.
+  - Use production-safe defaults: least privilege, parameterized inputs, secure cookies, scoped CORS, TLS, auth, rate limits, safe parsers, and sanitized logs.
+  - Output complete replacement file contents, not snippets.
+  - Never wrap CONTENT in markdown fences.
+  - After each action, wait for the next observation. Output PATCH_COMPLETE only after all validator criteria are satisfied.
+
 TOOLS:
   ACTION: edit <filepath>    — rewrite a file (provide CONTENT: block)
   ACTION: vyber <command>    — run shell command (chmod, etc.)
 
 OUTPUT FORMAT (one action per response):
 THINK: <one-line technical reasoning>
+PATCH_META: vuln=<vuln_id> control=<security control applied> validates=<expected validator result>
 ACTION: edit /tmp/sandbox/<filename>
 CONTENT:
 <full new secure file content>
 
 OR:
 THINK: <one-line reasoning>
+PATCH_META: vuln=<vuln_id> control=<security control applied> validates=<expected validator result>
 ACTION: vyber <command>
 
 Patch ALL vulnerabilities. When every vuln is fixed output: PATCH_COMPLETE"""
@@ -863,4 +1103,3 @@ Patch ALL vulnerabilities. When every vuln is fixed output: PATCH_COMPLETE"""
         blue_terminal += f"\n  [{ts()}] verdict : ✗ {open_count} VULNERABILITIES UNPATCHED\n"
         blue_terminal += f"  [{ts()}] result  : SYSTEM AT RISK\n"
         yield (red_terminal, blue_terminal, f"✗ {open_count}/{len(final_vulns)} vulnerabilities remain unpatched")
-
