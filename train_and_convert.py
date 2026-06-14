@@ -95,7 +95,7 @@ def train_and_convert_gguf(hf_token: str, repo_id: str):
         optim="adamw_torch",
         report_to="none",
         dataset_text_field="text",
-        max_seq_length=512
+        max_length=512
     )
 
     # 5. Initialize SFTTrainer
