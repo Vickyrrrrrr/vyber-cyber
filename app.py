@@ -349,6 +349,71 @@ button.primary:disabled {
     -webkit-text-fill-color: #594c43 !important;
 }
 
+.action-row .live-button,
+.action-row .live-button button,
+.action-row .live-button button.secondary,
+.action-row .live-button .secondary,
+#live-gpu-button,
+#live-gpu-button button,
+#live-gpu-button button.secondary,
+#live-gpu-button .secondary {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    border-color: #c99584 !important;
+    color: #802f1a !important;
+    -webkit-text-fill-color: #802f1a !important;
+    opacity: 1 !important;
+}
+
+.action-row .live-button:hover,
+.action-row .live-button:hover button,
+.action-row .live-button button:hover,
+.action-row .live-button button.secondary:hover,
+.action-row .live-button .secondary:hover,
+#live-gpu-button:hover,
+#live-gpu-button:hover button,
+#live-gpu-button button:hover,
+#live-gpu-button button.secondary:hover,
+#live-gpu-button .secondary:hover {
+    background: #f7f2eb !important;
+    background-color: #f7f2eb !important;
+    border-color: #802f1a !important;
+    color: #802f1a !important;
+    -webkit-text-fill-color: #802f1a !important;
+    opacity: 1 !important;
+}
+
+.action-row .live-button:active,
+.action-row .live-button button:active,
+.action-row .live-button button.secondary:active,
+.action-row .live-button:focus,
+.action-row .live-button button:focus,
+.action-row .live-button button.secondary:focus,
+#live-gpu-button:active,
+#live-gpu-button button:active,
+#live-gpu-button button.secondary:active,
+#live-gpu-button:focus,
+#live-gpu-button button:focus,
+#live-gpu-button button.secondary:focus {
+    background: #efe4d8 !important;
+    background-color: #efe4d8 !important;
+    border-color: #802f1a !important;
+    color: #802f1a !important;
+    -webkit-text-fill-color: #802f1a !important;
+}
+
+.action-row .live-button button:disabled,
+.action-row .live-button button.secondary:disabled,
+#live-gpu-button button:disabled,
+#live-gpu-button button.secondary:disabled {
+    background: #f2ece4 !important;
+    background-color: #f2ece4 !important;
+    border-color: #d7cab9 !important;
+    color: #594c43 !important;
+    -webkit-text-fill-color: #594c43 !important;
+    opacity: 1 !important;
+}
+
 .action-row {
     align-items: end !important;
     gap: 20px !important;
@@ -799,7 +864,7 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="zinc", secondary_hue="zinc")
             scale=1
         )
         demo_btn = gr.Button("Run Demo Replay", variant="primary", elem_id="launch-duel-button", elem_classes=["launch-button"], scale=0, min_width=190)
-        launch_btn = gr.Button("Launch Live GPU Duel", variant="secondary", elem_classes=["live-button"], scale=0, min_width=220)
+        launch_btn = gr.Button("Launch Live GPU Duel", variant="secondary", elem_id="live-gpu-button", elem_classes=["live-button"], scale=0, min_width=220)
 
     gr.HTML(
         "<div class='lab-note'>"
