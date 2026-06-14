@@ -138,6 +138,7 @@ html, body {
 .operation-terminal {
     background: transparent !important;
     border: none !important;
+    scroll-margin-top: 18px !important;
 }
 
 .operation-shell {
@@ -152,6 +153,7 @@ html, body {
     padding: 24px 28px !important;
     animation: none !important;
     transition: none !important;
+    scroll-behavior: auto !important;
 }
 
 .operation-shell pre {
@@ -390,6 +392,45 @@ h3 {
 }
 """
 
+js = """
+function trackVyberTerminal() {
+    const terminalRoot = document.querySelector("#operation-terminal") || document.querySelector(".operation-terminal");
+    const shell = terminalRoot ? terminalRoot.querySelector(".operation-shell") : document.querySelector(".operation-shell");
+    if (!shell) return;
+    shell.scrollTop = shell.scrollHeight;
+}
+
+function focusVyberTerminal() {
+    const terminalRoot = document.querySelector("#operation-terminal") || document.querySelector(".operation-terminal");
+    if (!terminalRoot) return;
+    terminalRoot.scrollIntoView({ behavior: "smooth", block: "start" });
+    requestAnimationFrame(trackVyberTerminal);
+}
+
+function bootVyberTerminalTracking() {
+    document.addEventListener("click", function(event) {
+        const launch = event.target.closest("#launch-duel-button");
+        if (!launch) return;
+        setTimeout(focusVyberTerminal, 120);
+        setTimeout(focusVyberTerminal, 700);
+    });
+
+    const observer = new MutationObserver(function() {
+        requestAnimationFrame(trackVyberTerminal);
+    });
+
+    observer.observe(document.body, {
+        childList: true,
+        characterData: true,
+        subtree: true
+    });
+
+    trackVyberTerminal();
+}
+
+bootVyberTerminalTracking();
+"""
+
 SCENARIO_CHOICES = [
     "Scenario 1: Insecure Configuration File (Secret Leak)",
     "Scenario 2: Exposed Database Port (Global Binding)",
@@ -507,7 +548,7 @@ def launch_duel(scenario_name):
             yield clean_console(error_msg), "Status: Connection Error"
 
 # Build Gradio UI
-with gr.Blocks(theme=gr.themes.Default(primary_hue="zinc", secondary_hue="zinc"), css=css) as demo:
+with gr.Blocks(theme=gr.themes.Default(primary_hue="zinc", secondary_hue="zinc"), css=css, js=js) as demo:
     gr.HTML(
         "<section class='hero'>"
         "<p class='hero-eyebrow'>Autonomous Cyber-Range</p>"
@@ -544,6 +585,7 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="zinc", secondary_hue="zinc")
     gr.Markdown("### Operation Terminal")
     operation_terminal = gr.HTML(
         value=format_operation_trace("", ""),
+        elem_id="operation-terminal",
         elem_classes=["operation-terminal"]
     )
             
