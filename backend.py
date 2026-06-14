@@ -605,6 +605,58 @@ def remediation_hint(vuln_id: str) -> str:
     }
     return hints.get(vuln_id, "apply the least-privilege secure configuration required by the validator")
 
+def normalize_exploit_report(report: str, expected_vulns: list[dict]) -> str:
+    expected_ids = {v["id"] for v in expected_vulns}
+    allowed_prefixes = (
+        "FINDING ",
+        "FILE:",
+        "CWE:",
+        "SEVERITY:",
+        "EVIDENCE:",
+        "ATTACK_PATH:",
+        "IMPACT:",
+    )
+    stop_prefixes = (
+        "RECOMMENDATION",
+        "RECOMMENDATIONS",
+        "MITIGATION",
+        "MITIGATIONS",
+        "VULNERABILITY STATUS",
+        "NIST",
+        "MITRE",
+        "DEFENSIVE POSTURE",
+        "RISK MITIGATION",
+    )
+    cleaned = []
+    current_finding = None
+
+    for raw_line in report.replace("\\n", "\n").splitlines():
+        line = raw_line.strip()
+        if not line:
+            if cleaned and cleaned[-1] != "":
+                cleaned.append("")
+            continue
+
+        upper = line.upper()
+        if upper.startswith(stop_prefixes):
+            break
+
+        if line.startswith("FINDING "):
+            parts = line.split()
+            current_finding = parts[1] if len(parts) > 1 else None
+            if current_finding in expected_ids:
+                cleaned.append(line)
+            continue
+
+        if current_finding not in expected_ids:
+            continue
+
+        if line.startswith(allowed_prefixes):
+            cleaned.append(line)
+
+    normalized = "\n".join(cleaned).strip()
+    return normalized or report.strip()
+
 # Stateful Execution Duel function
 @app.function(image=image)
 def run_duel_stream(scenario_id: int, openai_api_key: str = None) -> Generator[tuple[str, str, str], None, None]:
@@ -949,6 +1001,7 @@ Begin with `vyber list`, then read every vulnerable file before writing EXPLOIT_
 
                 if "EXPLOIT_REPORT:" in response:
                     exploit_report = response.split("EXPLOIT_REPORT:")[1].strip()
+                    exploit_report = normalize_exploit_report(exploit_report, remaining)
                     break
 
                 think, instruction = "", ""
@@ -967,6 +1020,7 @@ Begin with `vyber list`, then read every vulnerable file before writing EXPLOIT_
                     time.sleep(0.8)
                 else:
                     exploit_report = response
+                    exploit_report = normalize_exploit_report(exploit_report, remaining)
                     break
 
             red_terminal += fmt_section(f"ROUND {round_num}  EXPLOIT REPORT COMMITTED")
@@ -1015,13 +1069,30 @@ ACTION: vyber <command>
 
 Patch ALL vulnerabilities. When every vuln is fixed output: PATCH_COMPLETE"""
 
-            for turn in range(len(remaining) * 2 + 1):
+            for turn in range(len(remaining) * 3 + 3):
                 yield (red_terminal, blue_terminal + f"\n  [{ts()}] ▶ thinking...\n", f"Round {round_num} — Blue Agent patching...")
                 response = model_server.generate.remote(blue_prompt, openai_api_key)
 
                 if "PATCH_COMPLETE" in response:
-                    blue_terminal += f"  [{ts()}] PATCH_COMPLETE received\n"
-                    break
+                    check_vulns = CyberRangeScenarios.list_vulnerabilities(scenario_id, base_dir)
+                    check_open = [v for v in check_vulns if not v["fixed"]]
+                    if not check_open:
+                        blue_terminal += f"  [{ts()}] PATCH_COMPLETE accepted by validator\n"
+                        break
+                    validator_feedback = "; ".join(
+                        f"{v['id']} {v['file']} still open: {v['detail']} | required: {remediation_hint(v['id'])}"
+                        for v in check_open
+                    )
+                    blue_terminal += f"  [{ts()}] PATCH_COMPLETE rejected by validator\n"
+                    blue_terminal += f"  [{ts()}] OPEN   {validator_feedback}\n"
+                    blue_prompt += (
+                        "\nVALIDATOR_REJECTED_PATCH_COMPLETE:\n"
+                        f"{validator_feedback}\n"
+                        "Continue with ACTION: edit or ACTION: vyber. Do not output PATCH_COMPLETE until no vulnerabilities remain.\nNext:"
+                    )
+                    yield (red_terminal, blue_terminal, f"Round {round_num} — validator rejected incomplete patch")
+                    time.sleep(0.8)
+                    continue
 
                 think = response.split("THINK:")[1].split("\n")[0].strip() if "THINK:" in response else ""
 
@@ -1042,8 +1113,13 @@ Patch ALL vulnerabilities. When every vuln is fixed output: PATCH_COMPLETE"""
                         with open(filepath, "w") as f:
                             f.write(content)
                     blue_terminal += fmt_tool(f"write {os.path.basename(filepath)}", content[:300] + ("..." if len(content) > 300 else ""))
+                    after_vulns = CyberRangeScenarios.list_vulnerabilities(scenario_id, base_dir)
+                    after_open = [v for v in after_vulns if not v["fixed"]]
+                    validator_state = "all validators passed" if not after_open else "; ".join(
+                        f"{v['id']} open: {v['detail']}" for v in after_open
+                    )
                     yield (red_terminal, blue_terminal, f"Round {round_num} — patch applied to {os.path.basename(filepath)}")
-                    blue_prompt += f"\nTHINK: {think}\nACTION: edit {filepath}\nResult: written.\nNext:"
+                    blue_prompt += f"\nTHINK: {think}\nACTION: edit {filepath}\nResult: written.\nVALIDATOR_STATE: {validator_state}\nNext:"
                     time.sleep(0.8)
 
                 elif "ACTION: vyber" in response:
@@ -1055,11 +1131,24 @@ Patch ALL vulnerabilities. When every vuln is fixed output: PATCH_COMPLETE"""
                     blue_terminal += f"  [{ts()}] ACTION vyber {cmd}\n"
                     out = vyber_run(cmd, base_dir)
                     blue_terminal += fmt_tool(cmd, out)
+                    after_vulns = CyberRangeScenarios.list_vulnerabilities(scenario_id, base_dir)
+                    after_open = [v for v in after_vulns if not v["fixed"]]
+                    validator_state = "all validators passed" if not after_open else "; ".join(
+                        f"{v['id']} open: {v['detail']}" for v in after_open
+                    )
                     yield (red_terminal, blue_terminal, f"Round {round_num} — hardening: {cmd}")
-                    blue_prompt += f"\nTHINK: {think}\nACTION: vyber {cmd}\nSTDOUT:\n{out}\nNext:"
+                    blue_prompt += f"\nTHINK: {think}\nACTION: vyber {cmd}\nSTDOUT:\n{out}\nVALIDATOR_STATE: {validator_state}\nNext:"
                     time.sleep(0.8)
                 else:
-                    break
+                    blue_terminal += f"  [{ts()}] RESPONSE rejected: no actionable patch command\n"
+                    blue_prompt += (
+                        "\nFORMAT_REJECTED:\n"
+                        "Your previous response did not contain ACTION: edit, ACTION: vyber, or valid PATCH_COMPLETE.\n"
+                        "Continue with one concrete patch action using the required format.\nNext:"
+                    )
+                    yield (red_terminal, blue_terminal, f"Round {round_num} — waiting for actionable Blue Agent patch")
+                    time.sleep(0.8)
+                    continue
 
             # ── POST-ROUND SCOREBOARD ─────────────────────────────────
             current_vulns = CyberRangeScenarios.list_vulnerabilities(scenario_id, base_dir)

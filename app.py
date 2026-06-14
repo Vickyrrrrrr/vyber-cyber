@@ -1,5 +1,6 @@
 import os
 import time
+import html
 import gradio as gr
 import modal
 
@@ -134,69 +135,56 @@ html, body {
 .red-terminal textarea::-webkit-scrollbar-track { background: #1c1110; }
 .red-terminal textarea::-webkit-scrollbar-thumb { background: #5a2018; border-radius: 3px; }
 
-.operation-terminal textarea,
-.operation-terminal textarea:focus,
-.operation-terminal textarea:disabled,
-.operation-terminal textarea[readonly],
-.dark .operation-terminal textarea,
-.dark .operation-terminal textarea:focus,
-.dark .operation-terminal textarea:disabled,
-.dark .operation-terminal textarea[readonly] {
+.operation-terminal {
+    background: transparent !important;
+    border: none !important;
+}
+
+.operation-shell {
     background-color: #111312 !important;
-    background: #111312 !important;
     border: 1px solid #25221f !important;
     border-left: 3px solid #802f1a !important;
     border-radius: 4px !important;
+    box-shadow: none !important;
+    min-height: 520px !important;
+    max-height: 68vh !important;
+    overflow: auto !important;
+    padding: 24px 28px !important;
+    animation: none !important;
+    transition: none !important;
+}
+
+.operation-shell pre {
+    margin: 0 !important;
+    white-space: pre-wrap !important;
+    overflow-wrap: anywhere !important;
     color: #d8d0c4 !important;
-    -webkit-text-fill-color: #d8d0c4 !important;
-    opacity: 1 !important;
     font-family: 'JetBrains Mono', 'Fira Code', monospace !important;
     font-size: 0.84rem !important;
     font-weight: 400 !important;
     line-height: 1.58 !important;
-    padding: 24px 28px !important;
-    resize: none !important;
     text-shadow: none !important;
-    box-shadow: none !important;
-    caret-color: transparent !important;
-    outline: none !important;
-    animation: none !important;
-    transition: none !important;
-    filter: none !important;
+    background: transparent !important;
 }
+
+.operation-shell,
+.operation-shell *,
 .operation-terminal,
 .operation-terminal *,
-.operation-terminal.generating,
-.operation-terminal.generating *,
-.operation-terminal.pending,
-.operation-terminal.pending *,
-.operation-terminal .generating,
-.operation-terminal .pending,
-.operation-terminal [class*="generating"],
-.operation-terminal [class*="pending"] {
+.operation-terminal::before,
+.operation-terminal::after,
+.operation-terminal *::before,
+.operation-terminal *::after {
     animation: none !important;
     transition: none !important;
     opacity: 1 !important;
     filter: none !important;
-}
-.operation-terminal .wrap,
-.dark .operation-terminal .wrap {
-    background-color: #111312 !important;
-    border-color: #25221f !important;
-    border-radius: 4px !important;
     box-shadow: none !important;
 }
-.operation-terminal label, .operation-terminal .block-label,
-.dark .operation-terminal label, .dark .operation-terminal .block-label {
-    color: #7e695c !important;
-    -webkit-text-fill-color: #7e695c !important;
-    background: transparent !important;
-    font-size: 0.72rem !important;
-    letter-spacing: 0.04em !important;
-}
-.operation-terminal textarea::-webkit-scrollbar { width: 6px; }
-.operation-terminal textarea::-webkit-scrollbar-track { background: #111312; }
-.operation-terminal textarea::-webkit-scrollbar-thumb { background: #3b3029; border-radius: 3px; }
+
+.operation-shell::-webkit-scrollbar { width: 6px; }
+.operation-shell::-webkit-scrollbar-track { background: #111312; }
+.operation-shell::-webkit-scrollbar-thumb { background: #3b3029; border-radius: 3px; }
 
 /* ── BLUE TEAM TERMINAL — cool dark navy tint ── */
 .blue-terminal textarea,
@@ -331,6 +319,18 @@ def clean_console(text):
         "▶": "...",
         "—": "-",
         "–": "-",
+        "→": "->",
+        "─": "-",
+        "━": "-",
+        "╔": "+",
+        "╗": "+",
+        "╚": "+",
+        "╝": "+",
+        "║": "|",
+        "├": "|",
+        "│": "|",
+        "└": "|",
+        "\\n": "\n",
     }
     for old, new in replacements.items():
         text = text.replace(old, new)
@@ -375,7 +375,8 @@ def format_operation_trace(red_out, blue_out):
             blue,
         ])
 
-    return "\n".join(lines)
+    text = "\n".join(lines)
+    return "<div class='operation-shell'><pre>" + html.escape(text) + "</pre></div>"
 
 def launch_duel(scenario_name):
     scenario_id = SCENARIO_MAP.get(scenario_name, 1)
@@ -444,12 +445,8 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="zinc", secondary_hue="zinc")
     status_banner = gr.Markdown("Status: Active sandbox waiting for execution command", elem_id="status-banner")
     
     gr.Markdown("### Operation Terminal")
-    operation_terminal = gr.Textbox(
-        label="Autonomous Red-to-Blue Security Trace",
-        lines=26,
-        max_lines=34,
-        interactive=False,
-        autoscroll=True,
+    operation_terminal = gr.HTML(
+        value=format_operation_trace("", ""),
         elem_classes=["operation-terminal"]
     )
             
