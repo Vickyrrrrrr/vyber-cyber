@@ -950,7 +950,7 @@ def run_duel_stream(scenario_id: int, openai_api_key: str = None) -> Generator[t
         # Max 3 rounds to cap Modal GPU cost
         # ==========================================
         model_server = ModelServer()
-        MAX_ROUNDS = 3
+        MAX_ROUNDS = 1
 
         for round_num in range(1, MAX_ROUNDS + 1):
             remaining = [v for v in CyberRangeScenarios.list_vulnerabilities(scenario_id, base_dir) if not v["fixed"]]
@@ -1187,7 +1187,7 @@ Patch ALL vulnerabilities. When every vuln is fixed output: PATCH_COMPLETE"""
         yield (red_terminal, blue_terminal, f"✓ Secure — all {len(final_vulns)} vulnerabilities patched")
     else:
         open_count = sum(1 for v in final_vulns if not v["fixed"])
-        red_terminal  += f"\n  [{ts()}] verdict : ✓ {open_count} EXPLOITS STILL ACTIVE\n"
+        red_terminal  += f"\n  [{ts()}] verdict : ✗ {open_count} EXPLOITS STILL ACTIVE\n"
         red_terminal  += f"  [{ts()}] result  : SYSTEM COMPROMISED\n"
         blue_terminal += f"\n  [{ts()}] verdict : ✗ {open_count} VULNERABILITIES UNPATCHED\n"
         blue_terminal += f"  [{ts()}] result  : SYSTEM AT RISK\n"
