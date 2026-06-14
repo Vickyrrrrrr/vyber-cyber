@@ -14,6 +14,9 @@ import modal
 class CyberRangeScenarios:
     @staticmethod
     def init_scenario(scenario_id: int, base_dir: str):
+        base_dir_abs = os.path.abspath(base_dir)
+        if base_dir_abs.startswith("/tmp/") and os.path.exists(base_dir_abs):
+            shutil.rmtree(base_dir_abs)
         os.makedirs(base_dir, exist_ok=True)
 
         if scenario_id == 1:
@@ -552,41 +555,34 @@ class ModelServer:
         else:
             return "MOCK_RESPONSE"
 
-# Helper function to invoke Vyber CLI or fallback
+# Helper function to invoke deterministic sandbox-only Vyber tools
 def vyber_run(instruction: str, workspace_dir: str) -> str:
     """
-    Runs an instruction via the Vyber CLI in non-interactive script mode.
-    If the CLI fails or isn't authenticated, it falls back to standard execution.
+    Runs the small Red Team tool surface inside the sandbox.
+    Keep this deterministic: Red can list and read lab files without invoking
+    the larger OpenCode harness, so recon logs stay scoped to /tmp/sandbox.
     """
-    try:
-        # Standard non-interactive script execution with Vyber
-        res = subprocess.run(
-            ["vyber", "run", instruction],
-            capture_output=True,
-            text=True,
-            cwd=workspace_dir,
-            timeout=15
-        )
-        if res.returncode == 0:
-            return res.stdout + "\n" + res.stderr
-    except Exception:
-        pass
-    
-    # Fallback simulation logic for Vyber CLI commands. Keep this intentionally
-    # narrow: agents can inspect sandbox files and apply simple hardening, but
-    # they do not receive an unrestricted shell when the CLI is unavailable.
     instruction_lower = instruction.lower().strip()
+    workspace_abs = os.path.abspath(workspace_dir)
 
     def sandbox_files() -> list[str]:
         try:
             return sorted(
-                name for name in os.listdir(workspace_dir)
-                if os.path.isfile(os.path.join(workspace_dir, name))
+                name for name in os.listdir(workspace_abs)
+                if os.path.isfile(os.path.join(workspace_abs, name))
             )
         except Exception:
             return []
 
     def mentioned_file() -> str | None:
+        try:
+            tokens = shlex.split(instruction)
+        except ValueError:
+            tokens = instruction.split()
+        for token in tokens:
+            name = os.path.basename(token.strip())
+            if name in sandbox_files():
+                return name
         for name in sandbox_files():
             if name.lower() in instruction_lower:
                 return name
@@ -614,8 +610,8 @@ def vyber_run(instruction: str, workspace_dir: str) -> str:
         target = mentioned_file()
         cmd = ["cat", target] if target else ["ls", "-la"]
 
-    res = subprocess.run(cmd, capture_output=True, text=True, cwd=workspace_dir)
-    return f"[Vyber Agent SDK Fallback] Executing: {' '.join(cmd)}\n{res.stdout}\n{res.stderr}"
+    res = subprocess.run(cmd, capture_output=True, text=True, cwd=workspace_abs)
+    return f"[Vyber Sandbox Tool] $ {' '.join(cmd)}\n{res.stdout}\n{res.stderr}"
 
 def resolve_vyber_binary() -> str | None:
     candidates = [
@@ -1297,8 +1293,8 @@ PREVIOUS RED RE-ATTACK FEEDBACK:
         blue_terminal += f"  [{status}]  {v['id']}  {v['cwe']}  {v['file']}\n"
 
     if all_fixed:
-        red_terminal  += f"\n  [{ts()}] verdict : ✗ ALL EXPLOITS BLOCKED\n"
-        red_terminal  += f"  [{ts()}] result  : SYSTEM SECURE\n"
+        red_terminal  += f"\n  [{ts()}] attack result : BLOCKED BY PATCHES\n"
+        red_terminal  += f"  [{ts()}] system state  : SECURE\n"
         blue_terminal += f"\n  [{ts()}] verdict : ✓ ALL {len(final_attempts)} EXPLOITS BLOCKED BY PATCHES\n"
         blue_terminal += f"  [{ts()}] result  : SYSTEM SECURE\n"
         yield (red_terminal, blue_terminal, f"✓ Secure — red re-attack blocked all {len(final_attempts)} exploits")

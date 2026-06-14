@@ -1,6 +1,7 @@
 import os
 import time
 import html
+import re
 import gradio as gr
 import modal
 
@@ -416,6 +417,7 @@ SCENARIO_MAP = {
 }
 
 def clean_console(text):
+    text = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", text)
     replacements = {
         "✓": "PASS",
         "✗": "FAIL",
