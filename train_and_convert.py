@@ -16,7 +16,7 @@ image = (
         "torch",
         "transformers",
         "peft",
-        "trl",
+        "trl>=0.12.0",
         "accelerate",
         "datasets",
         "huggingface_hub",
