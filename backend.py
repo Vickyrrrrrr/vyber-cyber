@@ -421,7 +421,7 @@ class CyberRangeScenarios:
         return False, f"{len(remaining)}/{len(vulns)} vulnerabilities remain: {summary}"
 
     @staticmethod
-    def exploit_attempts(scenario_id: int, base_dir: str) -> list[dict]:
+    def exploit_recipe(vuln_id: str, description: str = "the vulnerable control") -> str:
         exploit_recipes = {
             "S1-V1": "Extract hardcoded database password and API key from app_config.json.",
             "S1-V2": "Harvest cloud/payment credentials from server.env.",
@@ -442,12 +442,16 @@ class CyberRangeScenarios:
             "S6-V2": "Upload arbitrary executable content through wildcard upload policy.",
             "S6-V3": "Escalate through root worker shell and unrestricted network egress.",
         }
+        return exploit_recipes.get(vuln_id, f"Re-run exploit for {description}.")
+
+    @staticmethod
+    def exploit_attempts(scenario_id: int, base_dir: str) -> list[dict]:
         attempts = []
         for vuln in CyberRangeScenarios.list_vulnerabilities(scenario_id, base_dir):
             blocked = vuln["fixed"]
             attempts.append({
                 **vuln,
-                "attack": exploit_recipes.get(vuln["id"], f"Re-run exploit for {vuln['description']}."),
+                "attack": CyberRangeScenarios.exploit_recipe(vuln["id"], vuln["description"]),
                 "blocked": blocked,
                 "result": "BLOCKED" if blocked else "STILL ACTIVE",
                 "evidence": vuln["detail"],
@@ -759,6 +763,13 @@ def normalize_exploit_report(report: str, expected_vulns: list[dict]) -> str:
     )
     cleaned = []
     current_finding = None
+    seen_findings = set()
+
+    def clean_field(line: str) -> str:
+        for marker in (" THINK:", " EXEC:", "\nTHINK:", "\nEXEC:"):
+            if marker in line:
+                line = line.split(marker, 1)[0]
+        return line.strip()
 
     for raw_line in report.replace("\\n", "\n").splitlines():
         line = raw_line.strip()
@@ -776,13 +787,29 @@ def normalize_exploit_report(report: str, expected_vulns: list[dict]) -> str:
             current_finding = parts[1] if len(parts) > 1 else None
             if current_finding in expected_ids:
                 cleaned.append(line)
+                seen_findings.add(current_finding)
             continue
 
         if current_finding not in expected_ids:
             continue
 
         if line.startswith(allowed_prefixes):
-            cleaned.append(line)
+            cleaned.append(clean_field(line))
+
+    for vuln in expected_vulns:
+        if vuln["id"] in seen_findings:
+            continue
+        if cleaned and cleaned[-1] != "":
+            cleaned.append("")
+        cleaned.extend([
+            f"FINDING {vuln['id']}",
+            f"FILE: {vuln['file']}",
+            f"CWE: {vuln['cwe']}",
+            "SEVERITY: High",
+            f"EVIDENCE: {vuln['detail']}",
+            f"ATTACK_PATH: {CyberRangeScenarios.exploit_recipe(vuln['id'], vuln['description'])}",
+            f"IMPACT: {vuln['description']}",
+        ])
 
     normalized = "\n".join(cleaned).strip()
     return normalized or report.strip()
@@ -1155,7 +1182,10 @@ ATTACK_PATH: <one-line realistic exploit path>
 IMPACT: <one-line business/security impact>
 ...
 
-Begin with `vyber list`, then read every vulnerable file before writing EXPLOIT_REPORT."""
+Rules:
+- Include exactly one FINDING block for every vulnerability listed above.
+- Do not include THINK or EXEC lines after EXPLOIT_REPORT.
+- Begin with `vyber list`, then read every vulnerable file before writing EXPLOIT_REPORT."""
 
             exploit_report = ""
             for turn in range(len(remaining) + 2):
