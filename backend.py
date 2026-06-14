@@ -616,6 +616,45 @@ def vyber_run(instruction: str, workspace_dir: str) -> str:
     res = subprocess.run(cmd, capture_output=True, text=True, cwd=workspace_dir)
     return f"[Vyber Agent SDK Fallback] Executing: {' '.join(cmd)}\n{res.stdout}\n{res.stderr}"
 
+def vyber_agent_run(task: str, workspace_dir: str, api_key: str = None, timeout: int = 180) -> dict:
+    """
+    Runs the Vyber/OpenCode harness as the Blue Team tool agent.
+    The harness gets direct workspace access through its own read/edit/shell tools.
+    """
+    env = os.environ.copy()
+    if api_key:
+        env["OPENAI_API_KEY"] = api_key
+
+    try:
+        res = subprocess.run(
+            ["vyber", "run", task],
+            capture_output=True,
+            text=True,
+            cwd=workspace_dir,
+            env=env,
+            timeout=timeout
+        )
+        return {
+            "ok": res.returncode == 0,
+            "returncode": res.returncode,
+            "stdout": res.stdout,
+            "stderr": res.stderr,
+        }
+    except FileNotFoundError as err:
+        return {
+            "ok": False,
+            "returncode": 127,
+            "stdout": "",
+            "stderr": f"Vyber harness unavailable: {err}",
+        }
+    except subprocess.TimeoutExpired as err:
+        return {
+            "ok": False,
+            "returncode": 124,
+            "stdout": err.stdout or "",
+            "stderr": f"Vyber harness timed out after {timeout}s.\n{err.stderr or ''}",
+        }
+
 def remediation_hint(vuln_id: str) -> str:
     hints = {
         "S1-V1": "replace plaintext database_url and api_key with environment-variable references; disable debug",
@@ -690,6 +729,39 @@ def normalize_exploit_report(report: str, expected_vulns: list[dict]) -> str:
 
     normalized = "\n".join(cleaned).strip()
     return normalized or report.strip()
+
+def parse_blue_edit_response(response: str, base_dir: str, fallback_file: str) -> tuple[str, str]:
+    rest = response.split("ACTION: edit", 1)[1].strip()
+    if "CONTENT:" in rest:
+        path_part, content = rest.split("CONTENT:", 1)
+    else:
+        path_part = rest.splitlines()[0] if rest.splitlines() else fallback_file
+        content = ""
+
+    try:
+        path_tokens = shlex.split(path_part.strip())
+    except ValueError:
+        path_tokens = path_part.strip().split()
+
+    raw_path = path_tokens[0] if path_tokens else fallback_file
+    filename = os.path.basename(raw_path.strip().strip(":"))
+    sandbox_files = {
+        name for name in os.listdir(base_dir)
+        if os.path.isfile(os.path.join(base_dir, name))
+    }
+    if filename not in sandbox_files:
+        filename = fallback_file
+
+    content = content.strip()
+    if content.startswith("```"):
+        content = "\n".join(
+            line for line in content.splitlines()
+            if not line.strip().startswith("```")
+        ).strip()
+    if "PATCH_COMPLETE" in content:
+        content = content.split("PATCH_COMPLETE", 1)[0].strip()
+
+    return os.path.join(base_dir, filename), content
 
 # Stateful Execution Duel function
 @app.function(image=image)
@@ -1063,126 +1135,77 @@ Begin with `vyber list`, then read every vulnerable file before writing EXPLOIT_
             yield (red_terminal, blue_terminal, f"Round {round_num} — Exploit report committed")
             time.sleep(1.0)
 
-            # ── BLUE AGENT: patch each remaining vuln ─────────────────
-            blue_terminal += fmt_section(f"ROUND {round_num}  BLUE AGENT  PATCHING {len(remaining)} VULNS")
+            # ── BLUE AGENT: patch through Vyber/OpenCode harness ─────────
+            blue_terminal += fmt_section(f"ROUND {round_num}  BLUE AGENT  VYBER HARNESS")
             blue_terminal += f"  [{ts()}] exploit intel received from red agent\n"
-            blue_terminal += f"  [{ts()}] initiating self-healing patch sequence\n"
-            yield (red_terminal, blue_terminal, f"Round {round_num} — Blue Agent patching...")
+            blue_terminal += f"  [{ts()}] granting Vyber harness read/edit/shell access inside /tmp/sandbox\n"
+            yield (red_terminal, blue_terminal, f"Round {round_num} — Blue Agent entering Vyber harness")
             time.sleep(0.5)
 
-            blue_prompt = f"""You are Vyber Blue, an autonomous self-healing security engineer running inside a controlled cyber-range. Operate only inside /tmp/sandbox/. Be concise, evidence-led, and defensive. No markdown fences.
+            reattack_feedback = ""
+            for repair_attempt in range(1, 4):
+                active_attempts = [
+                    v for v in CyberRangeScenarios.exploit_attempts(scenario_id, base_dir)
+                    if not v["blocked"]
+                ]
+                if not active_attempts:
+                    blue_terminal += f"  [{ts()}] all red re-attacks blocked before attempt {repair_attempt}\n"
+                    break
 
-THREAT INTEL (red team exploit report):
+                attack_plan = "\n".join(
+                    f"  {v['id']} | {v['cwe']} | {v['file']} | attack: {v['attack']} | evidence: {v['evidence']} | required: {remediation_hint(v['id'])}"
+                    for v in active_attempts
+                )
+                files = "\n".join(f"  - {name}" for name in sorted(os.listdir(base_dir)))
+                harness_task = f"""You are Vyber Blue, a tool-enabled self-healing security engineer.
+
+You are running inside /tmp/sandbox and may use your tools to read files, edit files, and run shell commands.
+Do not merely describe a fix. Edit the files on disk.
+
+RED EXPLOIT REPORT:
 {exploit_report}
 
-UNPATCHED VULNERABILITIES ({len(remaining)}):
-{vuln_list_txt}
+ACTIVE RED RE-ATTACKS TO BLOCK:
+{attack_plan}
 
-PATCH STANDARD:
-  - Preserve the app's intended behavior while removing the vulnerable pattern.
-  - Use production-safe defaults: least privilege, parameterized inputs, secure cookies, scoped CORS, TLS, auth, rate limits, safe parsers, and sanitized logs.
-  - Output complete replacement file contents, not snippets.
-  - Never wrap CONTENT in markdown fences.
-  - After each action, wait for the next observation. Output PATCH_COMPLETE only after all red re-attack attempts are blocked.
+SANDBOX FILES:
+{files}
 
-TOOLS:
-  ACTION: edit <filepath>    — rewrite a file (provide CONTENT: block)
-  ACTION: vyber <command>    — run shell command (chmod, etc.)
+REPAIR RULES:
+- Preserve intended application behavior while removing the exploit path.
+- Patch every active item listed above.
+- Use production-safe defaults: parameterized inputs, verified JWTs, env-backed secrets, scoped CORS, auth, rate limits, safe parsers, least privilege, sanitized logs.
+- After editing, inspect the files again.
+- Finish only after the files reflect the required controls.
 
-OUTPUT FORMAT (one action per response):
-THINK: <one-line technical reasoning>
-PATCH_META: vuln=<vuln_id> control=<security control applied> blocks=<expected red re-attack result>
-ACTION: edit /tmp/sandbox/<filename>
-CONTENT:
-<full new secure file content>
+PREVIOUS RED RE-ATTACK FEEDBACK:
+{reattack_feedback or "none"}
+"""
+                blue_terminal += f"  [{ts()}] VYBER attempt {repair_attempt}: launching tool harness\n"
+                yield (red_terminal, blue_terminal, f"Round {round_num} — Vyber harness patch attempt {repair_attempt}")
+                result = vyber_agent_run(harness_task, base_dir, api_key=openai_api_key)
 
-OR:
-THINK: <one-line reasoning>
-PATCH_META: vuln=<vuln_id> control=<security control applied> blocks=<expected red re-attack result>
-ACTION: vyber <command>
+                out = (result["stdout"] + "\n" + result["stderr"]).strip()
+                if len(out) > 3000:
+                    out = out[:3000] + "\n... output truncated ..."
+                status = "ok" if result["ok"] else f"exit={result['returncode']}"
+                blue_terminal += fmt_tool(f"vyber harness attempt {repair_attempt} ({status})", out)
 
-Patch ALL vulnerabilities. When every vuln is fixed output: PATCH_COMPLETE"""
+                attempts_after = CyberRangeScenarios.exploit_attempts(scenario_id, base_dir)
+                still_active = [v for v in attempts_after if not v["blocked"]]
+                if not still_active:
+                    blue_terminal += f"  [{ts()}] red re-attack blocked after Vyber attempt {repair_attempt}\n"
+                    break
 
-            for turn in range(len(remaining) * 3 + 3):
-                yield (red_terminal, blue_terminal + f"\n  [{ts()}] ▶ thinking...\n", f"Round {round_num} — Blue Agent patching...")
-                response = model_server.generate.remote(blue_prompt, openai_api_key)
-
-                if "PATCH_COMPLETE" in response:
-                    check_attempts = CyberRangeScenarios.exploit_attempts(scenario_id, base_dir)
-                    check_open = [v for v in check_attempts if not v["blocked"]]
-                    if not check_open:
-                        blue_terminal += f"  [{ts()}] PATCH_COMPLETE accepted: red re-attack blocked\n"
-                        break
-                    reattack_feedback = "; ".join(
-                        f"{v['id']} exploit still works: {v['attack']} | evidence: {v['evidence']} | required: {remediation_hint(v['id'])}"
-                        for v in check_open
-                    )
-                    blue_terminal += f"  [{ts()}] PATCH_COMPLETE rejected: red re-attack still succeeds\n"
-                    blue_terminal += f"  [{ts()}] ACTIVE {reattack_feedback}\n"
-                    blue_prompt += (
-                        "\nRED_REATTACK_REJECTED_PATCH_COMPLETE:\n"
-                        f"{reattack_feedback}\n"
-                        "Continue with ACTION: edit or ACTION: vyber. Do not output PATCH_COMPLETE until no vulnerabilities remain.\nNext:"
-                    )
-                    yield (red_terminal, blue_terminal, f"Round {round_num} — red re-attack rejected incomplete patch")
-                    time.sleep(0.8)
-                    continue
-
-                think = response.split("THINK:")[1].split("\n")[0].strip() if "THINK:" in response else ""
-
-                if "ACTION: edit" in response:
-                    try:
-                        fp_raw = response.split("ACTION: edit")[1].split("\n")[0].strip()
-                        filepath = fp_raw if fp_raw.startswith("/") else os.path.join(base_dir, os.path.basename(fp_raw))
-                        content = response.split("CONTENT:")[1].strip() if "CONTENT:" in response else ""
-                        if "PATCH_COMPLETE" in content:
-                            content = content.split("PATCH_COMPLETE")[0].strip()
-                    except Exception:
-                        filepath = os.path.join(base_dir, remaining[0]["file"])
-                        content = ""
-
-                    blue_terminal += f"  [{ts()}] THINK  {think}\n"
-                    blue_terminal += f"  [{ts()}] ACTION edit {os.path.basename(filepath)}\n"
-                    if content:
-                        with open(filepath, "w") as f:
-                            f.write(content)
-                    blue_terminal += fmt_tool(f"write {os.path.basename(filepath)}", content[:300] + ("..." if len(content) > 300 else ""))
-                    after_attempts = CyberRangeScenarios.exploit_attempts(scenario_id, base_dir)
-                    after_open = [v for v in after_attempts if not v["blocked"]]
-                    reattack_state = "all exploit attempts blocked" if not after_open else "; ".join(
-                        f"{v['id']} active: {v['attack']} ({v['evidence']})" for v in after_open
-                    )
-                    yield (red_terminal, blue_terminal, f"Round {round_num} — patch applied to {os.path.basename(filepath)}")
-                    blue_prompt += f"\nTHINK: {think}\nACTION: edit {filepath}\nResult: written.\nRED_REATTACK_STATE: {reattack_state}\nNext:"
-                    time.sleep(0.8)
-
-                elif "ACTION: vyber" in response:
-                    try:
-                        cmd = response.split("ACTION: vyber")[1].split("\n")[0].strip()
-                    except Exception:
-                        cmd = "chmod 600 app_config.json"
-                    blue_terminal += f"  [{ts()}] THINK  {think}\n"
-                    blue_terminal += f"  [{ts()}] ACTION vyber {cmd}\n"
-                    out = vyber_run(cmd, base_dir)
-                    blue_terminal += fmt_tool(cmd, out)
-                    after_attempts = CyberRangeScenarios.exploit_attempts(scenario_id, base_dir)
-                    after_open = [v for v in after_attempts if not v["blocked"]]
-                    reattack_state = "all exploit attempts blocked" if not after_open else "; ".join(
-                        f"{v['id']} active: {v['attack']} ({v['evidence']})" for v in after_open
-                    )
-                    yield (red_terminal, blue_terminal, f"Round {round_num} — hardening: {cmd}")
-                    blue_prompt += f"\nTHINK: {think}\nACTION: vyber {cmd}\nSTDOUT:\n{out}\nRED_REATTACK_STATE: {reattack_state}\nNext:"
-                    time.sleep(0.8)
-                else:
-                    blue_terminal += f"  [{ts()}] RESPONSE rejected: no actionable patch command\n"
-                    blue_prompt += (
-                        "\nFORMAT_REJECTED:\n"
-                        "Your previous response did not contain ACTION: edit, ACTION: vyber, or valid PATCH_COMPLETE.\n"
-                        "Continue with one concrete patch action using the required format.\nNext:"
-                    )
-                    yield (red_terminal, blue_terminal, f"Round {round_num} — waiting for actionable Blue Agent patch")
-                    time.sleep(0.8)
-                    continue
+                reattack_feedback = "\n".join(
+                    f"{v['id']} still active: {v['attack']} | evidence: {v['evidence']} | required: {remediation_hint(v['id'])}"
+                    for v in still_active
+                )
+                blue_terminal += f"  [{ts()}] red re-attack still succeeds after attempt {repair_attempt}\n"
+                for line in reattack_feedback.splitlines():
+                    blue_terminal += f"          {line}\n"
+                yield (red_terminal, blue_terminal, f"Round {round_num} — red re-attack still active after Vyber attempt {repair_attempt}")
+                time.sleep(0.8)
 
             # ── RED RE-ATTACK VERIFICATION ───────────────────────────────
             attempts = CyberRangeScenarios.exploit_attempts(scenario_id, base_dir)
