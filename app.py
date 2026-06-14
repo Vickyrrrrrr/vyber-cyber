@@ -285,6 +285,62 @@ button.primary:disabled {
     -webkit-text-fill-color: #fff8f3 !important;
 }
 
+.hero {
+    text-align: center !important;
+    max-width: 860px !important;
+    margin: 2px auto 30px auto !important;
+    padding: 4px 0 0 0 !important;
+}
+
+.hero-eyebrow {
+    color: #802f1a !important;
+    font-family: 'Inter', sans-serif !important;
+    font-size: 0.78rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 0 !important;
+    margin: 0 0 8px 0 !important;
+    text-transform: uppercase !important;
+}
+
+.hero h1 {
+    color: #231f1d !important;
+    font-family: 'Playfair Display', 'Georgia', serif !important;
+    font-size: 3rem !important;
+    line-height: 1.05 !important;
+    letter-spacing: 0 !important;
+    margin: 0 0 14px 0 !important;
+    font-weight: 700 !important;
+}
+
+.hero-lead {
+    color: #3a332f !important;
+    font-family: 'Inter', sans-serif !important;
+    font-size: 1.04rem !important;
+    line-height: 1.62 !important;
+    max-width: 720px !important;
+    margin: 0 auto 18px auto !important;
+}
+
+.hero-meta {
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    gap: 8px !important;
+    flex-wrap: wrap !important;
+}
+
+.hero-meta span {
+    background: #f2ece4 !important;
+    border: 1px solid #e6dfd5 !important;
+    border-radius: 999px !important;
+    color: #594c43 !important;
+    font-family: 'Inter', sans-serif !important;
+    font-size: 0.82rem !important;
+    font-weight: 600 !important;
+    line-height: 1 !important;
+    padding: 8px 11px !important;
+}
+
 /* Status Banner - Warm gray/beige banner with high contrast text */
 #status-banner {
     background-color: #f2ece4 !important;
@@ -330,7 +386,7 @@ h3 {
     font-family: 'Inter', sans-serif !important;
     font-size: 0.75rem !important;
     text-transform: uppercase !important;
-    letter-spacing: 0.05em !important;
+    letter-spacing: 0 !important;
 }
 """
 
@@ -453,22 +509,18 @@ def launch_duel(scenario_name):
 # Build Gradio UI
 with gr.Blocks(theme=gr.themes.Default(primary_hue="zinc", secondary_hue="zinc"), css=css) as demo:
     gr.HTML(
-        "<div style='text-align: center; margin-bottom: 40px;'>"
-        "<p style='color: #802f1a; font-family: \"Inter\", sans-serif; font-size: 0.85rem; font-weight: 600; letter-spacing: 0.15em; margin-bottom: 12px; text-transform: uppercase;'>"
-        "Autonomous Self-Healing Cyber-Range"
+        "<section class='hero'>"
+        "<p class='hero-eyebrow'>Autonomous Cyber-Range</p>"
+        "<h1>Vyber Duel</h1>"
+        "<p class='hero-lead'>"
+        "Red finds the exploit, Blue patches the code, and Red replays the same attack to verify the fix inside an isolated sandbox."
         "</p>"
-        "<h1 style='color: #231f1d; font-family: \"Playfair Display\", \"Georgia\", serif; font-size: 3rem; margin-bottom: 12px; font-weight: 700; letter-spacing: -0.01em;'>"
-        "Vyber Duel"
-        "</h1>"
-        "<p style='color: #802f1a; font-family: \"Playfair Display\", \"Georgia\", serif; font-size: 1.35rem; font-style: italic; margin-bottom: 20px; font-weight: 400;'>"
-        "will the defense agent patch the vulnerability before the attack succeeds?"
-        "</p>"
-        "<p style='color: #594c43; font-family: \"Inter\", sans-serif; font-size: 1rem; max-width: 800px; margin: 0 auto; line-height: 1.6; font-weight: 400;'>"
-        "A serverless cyber-range where a custom fine-tuned 7B cybersecurity model acts as both offensive attacker and defensive responder. "
-        "Running on the <strong>llama.cpp</strong> runtime with local CUDA acceleration.<br/>"
-        "<span style='color: #802f1a; font-size: 0.85rem; font-weight: 500;'>Note: Initial execution requires 3-4 minutes to compile CUDA wheels, spin up hardware, and load GGUF weights.</span>"
-        "</p>"
+        "<div class='hero-meta'>"
+        "<span>Fine-tuned 7B security model</span>"
+        "<span>llama.cpp on Modal GPU</span>"
+        "<span>First run warms hardware and loads GGUF weights</span>"
         "</div>"
+        "</section>"
     )
     
     with gr.Row():
