@@ -11,9 +11,7 @@ pinned: false
 tags:
   - track:backyard
   - track:wood
-  - sponsor:openbmb
   - sponsor:openai
-  - sponsor:nvidia
   - sponsor:modal
   - achievement:offgrid
   - achievement:welltuned
