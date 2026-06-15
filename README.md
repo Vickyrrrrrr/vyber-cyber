@@ -34,6 +34,8 @@ tags:
   ·
   <a href="https://github.com/Vickyrrrrrr/vyber-cyber"><strong>Source</strong></a>
   ·
+  <a href="https://x.com/UnfilteredLogix/status/2066581507897282659?s=20"><strong>Social Post / Video Demo</strong></a>
+  ·
   <a href="https://huggingface.co/build-small-hackathon"><strong>Build Small Hackathon</strong></a>
 </p>
 
