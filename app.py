@@ -729,6 +729,42 @@ def format_operation_trace(red_out, blue_out, backend_label="Hugging Face Space 
         "</pre></div>"
     )
 
+def save_session_log(mode: str, scenario_id: int, red_out: str, blue_out: str) -> str:
+    import datetime
+    # Ensure logs folder exists
+    os.makedirs("logs", exist_ok=True)
+    
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"logs/session_{timestamp}_{mode}_scenario_{scenario_id}.log"
+    
+    red_clean = clean_console(red_out or "").strip()
+    blue_clean = clean_console(blue_out or "").strip()
+    
+    log_content = (
+        f"VYBER OPERATION LOG\n"
+        f"===================\n"
+        f"Timestamp: {datetime.datetime.now().isoformat()}\n"
+        f"Mode: {mode}\n"
+        f"Scenario: {scenario_id}\n\n"
+        f"PHASE 01 / RED TEAM DISCOVERY\n"
+        f"------------------------------------------------------------\n"
+        f"{red_clean}\n\n"
+    )
+    if blue_clean:
+        log_content += (
+            f"PHASE 02 / BLUE TEAM REMEDIATION\n"
+            f"------------------------------------------------------------\n"
+            f"{blue_clean}\n"
+        )
+    
+    try:
+        with open(filename, "w", encoding="utf-8") as f:
+            f.write(log_content)
+        return filename
+    except Exception as e:
+        print(f"Failed to save session log: {e}")
+        return ""
+
 def run_demo_replay(scenario_name):
     scenario_id = SCENARIO_MAP.get(scenario_name, 1)
     demo = DEMO_SCENARIOS[scenario_id]
@@ -740,7 +776,7 @@ def run_demo_replay(scenario_name):
         f"  [demo] scenario   : {scenario_id}\n"
         "  [demo] status     : target files deployed\n"
     )
-    yield format_operation_trace(red, "", "Demo replay (no GPU)"), "Status: Demo replay started - no GPU credits used"
+    yield format_operation_trace(red, "", "Demo replay (no GPU)"), "Status: Demo replay started - no GPU credits used", gr.update(visible=False)
     time.sleep(0.4)
 
     red += "\n+--------------------------------------------+\n"
@@ -749,7 +785,7 @@ def run_demo_replay(scenario_name):
     for vuln_id, cwe, filename, issue in zip(ids, demo["cwes"], demo["files"], demo["issues"]):
         red += f"  [OPEN]  {vuln_id}  {cwe}  {filename}\n"
         red += f"          {issue}\n"
-    yield format_operation_trace(red, "", "Demo replay (no GPU)"), "Status: Demo Red Agent mapped the threat surface"
+    yield format_operation_trace(red, "", "Demo replay (no GPU)"), "Status: Demo Red Agent mapped the threat surface", gr.update(visible=False)
     time.sleep(0.5)
 
     red += "\n+--------------------------------------------+\n"
@@ -763,7 +799,7 @@ def run_demo_replay(scenario_name):
         red += f"  EVIDENCE: {issue}\n"
         red += f"  ATTACK_PATH: Red replays the lab exploit against {filename}.\n"
         red += f"  IMPACT: {issue}\n"
-    yield format_operation_trace(red, "", "Demo replay (no GPU)"), "Status: Demo Red Agent committed exploit report"
+    yield format_operation_trace(red, "", "Demo replay (no GPU)"), "Status: Demo Red Agent committed exploit report", gr.update(visible=False)
     time.sleep(0.5)
 
     blue = (
@@ -780,7 +816,7 @@ def run_demo_replay(scenario_name):
     for vuln_id, filename, fix in zip(ids, demo["files"], demo["fixes"]):
         blue += f"  [PATCHED] {vuln_id}  {filename}\n"
         blue += f"            {fix}\n"
-    yield format_operation_trace(red, blue, "Demo replay (no GPU)"), "Status: Demo Blue Agent patched all findings"
+    yield format_operation_trace(red, blue, "Demo replay (no GPU)"), "Status: Demo Blue Agent patched all findings", gr.update(visible=False)
     time.sleep(0.5)
 
     verdict = "\n+--------------------------------------------+\n"
@@ -790,9 +826,14 @@ def run_demo_replay(scenario_name):
         verdict += f"  [BLOCKED]  {vuln_id}  {cwe}  {filename}\n"
     verdict += "\n  [demo] verdict : PASS ALL 3 EXPLOITS BLOCKED BY PATCHES\n"
     verdict += "  [demo] result  : SYSTEM SECURE\n"
-    red += verdict
     blue += verdict
-    yield format_operation_trace(red, blue, "Demo replay (no GPU)"), "Status: Demo complete - live GPU was not used"
+    saved_path = save_session_log("demo", scenario_id, red, blue)
+    status_msg = "Status: Demo complete"
+    if saved_path:
+        status_msg += f" - Log saved to {saved_path}"
+    else:
+        status_msg += " - live GPU was not used"
+    yield format_operation_trace(red, blue, "Demo replay (no GPU)"), status_msg, gr.update(value=saved_path, visible=True) if saved_path else gr.update(visible=False)
 
 def launch_duel(scenario_name):
     scenario_id = SCENARIO_MAP.get(scenario_name, 1)
@@ -804,12 +845,16 @@ def launch_duel(scenario_name):
             "  status     : live Modal GPU duel already running\n"
             "  action     : run the demo replay now, or retry live mode shortly\n"
         )
-        yield format_operation_trace(busy, "", "Live Modal GPU worker"), "Status: Live GPU busy - demo replay is available"
+        yield format_operation_trace(busy, "", "Live Modal GPU worker"), "Status: Live GPU busy - demo replay is available", gr.update(visible=False)
         return
+
+    last_red_out = ""
+    last_blue_out = ""
+    saved_successfully = False
 
     try:
         # Immediately notify the user of real state
-        yield format_operation_trace("", ""), "Status: Connecting to serverless GPU backend (provisioning node and loading weights)..."
+        yield format_operation_trace("", ""), "Status: Connecting to serverless GPU backend (provisioning node and loading weights)...", gr.update(visible=False)
 
         # Connect securely to active Modal application
         openai_api_key = os.environ.get("OPENAI_API_KEY", "")
@@ -818,7 +863,10 @@ def launch_duel(scenario_name):
             f = modal.Function.from_name("cyber-defense-range", "run_duel_stream")
             # Call generator to stream outputs character-by-character
             for red_out, blue_out, banner_txt in f.remote_gen(scenario_id, openai_api_key=openai_api_key):
-                yield format_operation_trace(red_out, blue_out), f"Status: {clean_console(banner_txt)}"
+                last_red_out = red_out
+                last_blue_out = blue_out
+                yield format_operation_trace(red_out, blue_out), f"Status: {clean_console(banner_txt)}", gr.update(visible=False)
+            saved_successfully = True
         except Exception as e:
             print(f"Modal Remote Gen lookup failed: {e}. Falling back to local execution.")
             # Fallback to local import if Modal client is not fully authenticated/connected
@@ -827,14 +875,24 @@ def launch_duel(scenario_name):
                 from backend import run_duel_stream
                 # Execute generator locally (directly calls the function logic)
                 for red_out, blue_out, banner_txt in run_duel_stream.local(scenario_id, openai_api_key=openai_api_key):
-                    yield format_operation_trace(red_out, blue_out), f"Status: {clean_console(banner_txt)}"
+                    last_red_out = red_out
+                    last_blue_out = blue_out
+                    yield format_operation_trace(red_out, blue_out), f"Status: {clean_console(banner_txt)}", gr.update(visible=False)
+                saved_successfully = True
             except Exception as local_err:
                 print(f"Live GPU backend unavailable. Modal detail: {e}. Local fallback detail: {local_err}")
                 error_msg = (
                     "Live GPU backend is currently paused to save compute cost.\n"
                     "Run Demo Replay now, or retry Live GPU Duel during the judging window."
                 )
-                yield format_operation_trace(clean_console(error_msg), ""), "Status: Live GPU paused - demo replay is available"
+                yield format_operation_trace(clean_console(error_msg), ""), "Status: Live GPU paused - demo replay is available", gr.update(visible=False)
+
+        if saved_successfully and (last_red_out or last_blue_out):
+            saved_path = save_session_log("live", scenario_id, last_red_out, last_blue_out)
+            if saved_path:
+                yield format_operation_trace(last_red_out, last_blue_out), f"Status: Live GPU Duel complete - Log saved to {saved_path}", gr.update(value=saved_path, visible=True)
+            else:
+                yield format_operation_trace(last_red_out, last_blue_out), "Status: Live GPU Duel complete", gr.update(visible=False)
     finally:
         LIVE_GPU_LOCK.release()
 
@@ -875,6 +933,8 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="zinc", secondary_hue="zinc")
         
     status_banner = gr.Markdown("Status: Active sandbox waiting for execution command", elem_id="status-banner")
     
+    download_logs = gr.File(label="Download Session Log", visible=False, elem_id="download-logs")
+    
     gr.Markdown("### Operation Terminal")
     operation_terminal = gr.HTML(
         value=format_operation_trace("", ""),
@@ -885,7 +945,7 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="zinc", secondary_hue="zinc")
     demo_btn.click(
         fn=run_demo_replay,
         inputs=scenario_dropdown,
-        outputs=[operation_terminal, status_banner],
+        outputs=[operation_terminal, status_banner, download_logs],
         scroll_to_output=True,
         concurrency_limit=20,
         concurrency_id="demo_replay"
@@ -894,7 +954,7 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="zinc", secondary_hue="zinc")
     launch_btn.click(
         fn=launch_duel,
         inputs=scenario_dropdown,
-        outputs=[operation_terminal, status_banner],
+        outputs=[operation_terminal, status_banner, download_logs],
         scroll_to_output=True,
         concurrency_limit=1,
         concurrency_id="live_gpu_duel"

@@ -1298,18 +1298,14 @@ PREVIOUS RED RE-ATTACK FEEDBACK:
             attempts = CyberRangeScenarios.exploit_attempts(scenario_id, base_dir)
             still_active = [v for v in attempts if not v["blocked"]]
 
-            red_terminal += fmt_section(f"ROUND {round_num}  RED RE-ATTACK VERIFICATION")
             blue_terminal += fmt_section(f"ROUND {round_num}  RED RE-ATTACK VERIFICATION")
             for v in attempts:
                 status = "BLOCKED" if v["blocked"] else "ACTIVE "
                 line = f"  [{status}]  {v['id']}  {v['file']}  attack={v['attack']}\n"
-                red_terminal += line
                 blue_terminal += line
                 if not v["blocked"]:
-                    red_terminal += f"            evidence={v['evidence']}\n"
                     blue_terminal += f"            evidence={v['evidence']}\n"
 
-            red_terminal  += f"\n  [{ts()}] active exploits : {len(still_active)}/{len(attempts)}\n"
             blue_terminal += f"\n  [{ts()}] active exploits : {len(still_active)}/{len(attempts)}\n"
             yield (red_terminal, blue_terminal, f"Round {round_num} complete — red re-attack found {len(still_active)} active exploits")
             time.sleep(1.0)
@@ -1318,24 +1314,18 @@ PREVIOUS RED RE-ATTACK FEEDBACK:
     final_attempts = CyberRangeScenarios.exploit_attempts(scenario_id, base_dir)
     all_fixed = all(v["blocked"] for v in final_attempts)
 
-    red_terminal  += fmt_section("FINAL VERDICT")
     blue_terminal += fmt_section("FINAL VERDICT")
 
     for v in final_attempts:
         status = "BLOCKED" if v["blocked"] else "ACTIVE "
-        red_terminal  += f"  [{status}]  {v['id']}  {v['cwe']}  {v['file']}\n"
         blue_terminal += f"  [{status}]  {v['id']}  {v['cwe']}  {v['file']}\n"
 
     if all_fixed:
-        red_terminal  += f"\n  [{ts()}] attack result : BLOCKED BY PATCHES\n"
-        red_terminal  += f"  [{ts()}] system state  : SECURE\n"
         blue_terminal += f"\n  [{ts()}] verdict : ✓ ALL {len(final_attempts)} EXPLOITS BLOCKED BY PATCHES\n"
         blue_terminal += f"  [{ts()}] result  : SYSTEM SECURE\n"
         yield (red_terminal, blue_terminal, f"✓ Secure — red re-attack blocked all {len(final_attempts)} exploits")
     else:
         open_count = sum(1 for v in final_attempts if not v["blocked"])
-        red_terminal  += f"\n  [{ts()}] verdict : ✗ {open_count} EXPLOITS STILL ACTIVE\n"
-        red_terminal  += f"  [{ts()}] result  : SYSTEM COMPROMISED\n"
         blue_terminal += f"\n  [{ts()}] verdict : ✗ {open_count} RED RE-ATTACKS STILL SUCCEED\n"
         blue_terminal += f"  [{ts()}] result  : SYSTEM AT RISK\n"
         yield (red_terminal, blue_terminal, f"✗ {open_count}/{len(final_attempts)} red re-attacks still succeed")
