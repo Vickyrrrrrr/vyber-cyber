@@ -548,6 +548,46 @@ h3 {
     text-transform: uppercase !important;
     letter-spacing: 0 !important;
 }
+
+/* Session logs and text styling */
+#download-logs, #download-logs * {
+    background-color: #ffffff !important;
+    color: #231f1d !important;
+}
+#log-textbox textarea {
+    background-color: #ffffff !important;
+    color: #231f1d !important;
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 0.85rem !important;
+}
+.terminal-header {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    margin-top: 15px !important;
+    margin-bottom: 5px !important;
+}
+.terminal-title h3 {
+    margin: 0 !important;
+}
+#copy-logs-btn {
+    margin: 0 !important;
+    padding: 6px 14px !important;
+    font-size: 0.85rem !important;
+    font-family: 'Inter', sans-serif !important;
+    background-color: #ffffff !important;
+    border: 1px solid #e6dfd5 !important;
+    color: #231f1d !important;
+    border-radius: 4px !important;
+    cursor: pointer !important;
+    height: auto !important;
+    min-height: unset !important;
+}
+#copy-logs-btn:hover {
+    background-color: #f2ece4 !important;
+    border-color: #802f1a !important;
+    color: #802f1a !important;
+}
 """
 
 SCENARIO_CHOICES = [
@@ -729,7 +769,7 @@ def format_operation_trace(red_out, blue_out, backend_label="Hugging Face Space 
         "</pre></div>"
     )
 
-def save_session_log(mode: str, scenario_id: int, red_out: str, blue_out: str) -> str:
+def save_session_log(mode: str, scenario_id: int, red_out: str, blue_out: str) -> tuple[str, str]:
     import datetime
     # Ensure logs folder exists
     os.makedirs("logs", exist_ok=True)
@@ -760,10 +800,10 @@ def save_session_log(mode: str, scenario_id: int, red_out: str, blue_out: str) -
     try:
         with open(filename, "w", encoding="utf-8") as f:
             f.write(log_content)
-        return filename
+        return filename, log_content
     except Exception as e:
         print(f"Failed to save session log: {e}")
-        return ""
+        return "", log_content
 
 def run_demo_replay(scenario_name):
     scenario_id = SCENARIO_MAP.get(scenario_name, 1)
@@ -776,7 +816,7 @@ def run_demo_replay(scenario_name):
         f"  [demo] scenario   : {scenario_id}\n"
         "  [demo] status     : target files deployed\n"
     )
-    yield format_operation_trace(red, "", "Demo replay (no GPU)"), "Status: Demo replay started - no GPU credits used", gr.update(visible=False)
+    yield format_operation_trace(red, "", "Demo replay (no GPU)"), "Status: Demo replay started - no GPU credits used", gr.update(visible=False), gr.update(visible=False)
     time.sleep(0.4)
 
     red += "\n+--------------------------------------------+\n"
@@ -785,7 +825,7 @@ def run_demo_replay(scenario_name):
     for vuln_id, cwe, filename, issue in zip(ids, demo["cwes"], demo["files"], demo["issues"]):
         red += f"  [OPEN]  {vuln_id}  {cwe}  {filename}\n"
         red += f"          {issue}\n"
-    yield format_operation_trace(red, "", "Demo replay (no GPU)"), "Status: Demo Red Agent mapped the threat surface", gr.update(visible=False)
+    yield format_operation_trace(red, "", "Demo replay (no GPU)"), "Status: Demo Red Agent mapped the threat surface", gr.update(visible=False), gr.update(visible=False)
     time.sleep(0.5)
 
     red += "\n+--------------------------------------------+\n"
@@ -799,7 +839,7 @@ def run_demo_replay(scenario_name):
         red += f"  EVIDENCE: {issue}\n"
         red += f"  ATTACK_PATH: Red replays the lab exploit against {filename}.\n"
         red += f"  IMPACT: {issue}\n"
-    yield format_operation_trace(red, "", "Demo replay (no GPU)"), "Status: Demo Red Agent committed exploit report", gr.update(visible=False)
+    yield format_operation_trace(red, "", "Demo replay (no GPU)"), "Status: Demo Red Agent committed exploit report", gr.update(visible=False), gr.update(visible=False)
     time.sleep(0.5)
 
     blue = (
@@ -816,7 +856,7 @@ def run_demo_replay(scenario_name):
     for vuln_id, filename, fix in zip(ids, demo["files"], demo["fixes"]):
         blue += f"  [PATCHED] {vuln_id}  {filename}\n"
         blue += f"            {fix}\n"
-    yield format_operation_trace(red, blue, "Demo replay (no GPU)"), "Status: Demo Blue Agent patched all findings", gr.update(visible=False)
+    yield format_operation_trace(red, blue, "Demo replay (no GPU)"), "Status: Demo Blue Agent patched all findings", gr.update(visible=False), gr.update(visible=False)
     time.sleep(0.5)
 
     verdict = "\n+--------------------------------------------+\n"
@@ -827,13 +867,13 @@ def run_demo_replay(scenario_name):
     verdict += "\n  [demo] verdict : PASS ALL 3 EXPLOITS BLOCKED BY PATCHES\n"
     verdict += "  [demo] result  : SYSTEM SECURE\n"
     blue += verdict
-    saved_path = save_session_log("demo", scenario_id, red, blue)
+    saved_path, log_content = save_session_log("demo", scenario_id, red, blue)
     status_msg = "Status: Demo complete"
     if saved_path:
         status_msg += f" - Log saved to {saved_path}"
     else:
         status_msg += " - live GPU was not used"
-    yield format_operation_trace(red, blue, "Demo replay (no GPU)"), status_msg, gr.update(value=saved_path, visible=True) if saved_path else gr.update(visible=False)
+    yield format_operation_trace(red, blue, "Demo replay (no GPU)"), status_msg, (gr.update(value=saved_path, visible=True) if saved_path else gr.update(visible=False)), gr.update(value=log_content, visible=False)
 
 def launch_duel(scenario_name):
     scenario_id = SCENARIO_MAP.get(scenario_name, 1)
@@ -845,7 +885,7 @@ def launch_duel(scenario_name):
             "  status     : live Modal GPU duel already running\n"
             "  action     : run the demo replay now, or retry live mode shortly\n"
         )
-        yield format_operation_trace(busy, "", "Live Modal GPU worker"), "Status: Live GPU busy - demo replay is available", gr.update(visible=False)
+        yield format_operation_trace(busy, "", "Live Modal GPU worker"), "Status: Live GPU busy - demo replay is available", gr.update(visible=False), gr.update(visible=False)
         return
 
     last_red_out = ""
@@ -854,7 +894,7 @@ def launch_duel(scenario_name):
 
     try:
         # Immediately notify the user of real state
-        yield format_operation_trace("", ""), "Status: Connecting to serverless GPU backend (provisioning node and loading weights)...", gr.update(visible=False)
+        yield format_operation_trace("", ""), "Status: Connecting to serverless GPU backend (provisioning node and loading weights)...", gr.update(visible=False), gr.update(visible=False)
 
         # Connect securely to active Modal application
         openai_api_key = os.environ.get("OPENAI_API_KEY", "")
@@ -865,7 +905,7 @@ def launch_duel(scenario_name):
             for red_out, blue_out, banner_txt in f.remote_gen(scenario_id, openai_api_key=openai_api_key):
                 last_red_out = red_out
                 last_blue_out = blue_out
-                yield format_operation_trace(red_out, blue_out), f"Status: {clean_console(banner_txt)}", gr.update(visible=False)
+                yield format_operation_trace(red_out, blue_out), f"Status: {clean_console(banner_txt)}", gr.update(visible=False), gr.update(visible=False)
             saved_successfully = True
         except Exception as e:
             print(f"Modal Remote Gen lookup failed: {e}. Falling back to local execution.")
@@ -877,7 +917,7 @@ def launch_duel(scenario_name):
                 for red_out, blue_out, banner_txt in run_duel_stream.local(scenario_id, openai_api_key=openai_api_key):
                     last_red_out = red_out
                     last_blue_out = blue_out
-                    yield format_operation_trace(red_out, blue_out), f"Status: {clean_console(banner_txt)}", gr.update(visible=False)
+                    yield format_operation_trace(red_out, blue_out), f"Status: {clean_console(banner_txt)}", gr.update(visible=False), gr.update(visible=False)
                 saved_successfully = True
             except Exception as local_err:
                 print(f"Live GPU backend unavailable. Modal detail: {e}. Local fallback detail: {local_err}")
@@ -885,14 +925,14 @@ def launch_duel(scenario_name):
                     "Live GPU backend is currently paused to save compute cost.\n"
                     "Run Demo Replay now, or retry Live GPU Duel during the judging window."
                 )
-                yield format_operation_trace(clean_console(error_msg), ""), "Status: Live GPU paused - demo replay is available", gr.update(visible=False)
+                yield format_operation_trace(clean_console(error_msg), ""), "Status: Live GPU paused - demo replay is available", gr.update(visible=False), gr.update(visible=False)
 
         if saved_successfully and (last_red_out or last_blue_out):
-            saved_path = save_session_log("live", scenario_id, last_red_out, last_blue_out)
+            saved_path, log_content = save_session_log("live", scenario_id, last_red_out, last_blue_out)
             if saved_path:
-                yield format_operation_trace(last_red_out, last_blue_out), f"Status: Live GPU Duel complete - Log saved to {saved_path}", gr.update(value=saved_path, visible=True)
+                yield format_operation_trace(last_red_out, last_blue_out), f"Status: Live GPU Duel complete - Log saved to {saved_path}", gr.update(value=saved_path, visible=True), gr.update(value=log_content, visible=False)
             else:
-                yield format_operation_trace(last_red_out, last_blue_out), "Status: Live GPU Duel complete", gr.update(visible=False)
+                yield format_operation_trace(last_red_out, last_blue_out), "Status: Live GPU Duel complete", gr.update(visible=False), gr.update(value=log_content, visible=False)
     finally:
         LIVE_GPU_LOCK.release()
 
@@ -921,21 +961,25 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="zinc", secondary_hue="zinc")
             elem_classes=["scenario-selector"],
             scale=1
         )
-        demo_btn = gr.Button("Run Demo Replay", variant="primary", elem_id="launch-duel-button", elem_classes=["launch-button"], scale=0, min_width=190)
-        launch_btn = gr.Button("Launch Live GPU Duel", variant="secondary", elem_id="live-gpu-button", elem_classes=["live-button"], scale=0, min_width=220)
+        launch_btn = gr.Button("Launch Live GPU Duel", variant="primary", elem_id="launch-duel-button", elem_classes=["launch-button"], scale=0, min_width=220)
+        demo_btn = gr.Button("Run Demo Replay", variant="secondary", elem_id="live-gpu-button", elem_classes=["live-button"], scale=0, min_width=190)
 
     gr.HTML(
         "<div class='lab-note'>"
-        "<strong>Public demo mode:</strong> Run Demo Replay is instant and uses no GPU credits. "
-        "Live GPU may be paused to save compute and enabled during judging windows."
+        "<strong>Live GPU Duel:</strong> Automatically launches the autonomous Red Agent and Blue Agent patch loop. "
+        "Demo Replay runs the no-GPU simulated trace."
         "</div>"
     )
         
     status_banner = gr.Markdown("Status: Active sandbox waiting for execution command", elem_id="status-banner")
     
-    download_logs = gr.File(label="Download Session Log", visible=False, elem_id="download-logs")
+    download_logs = gr.File(label="Download Session Log File", visible=False, elem_id="download-logs")
+    log_textbox = gr.Textbox(label="Session Log (Copy to Clipboard)", visible=False, elem_id="log-textbox", show_copy_button=True, lines=10)
     
-    gr.Markdown("### Operation Terminal")
+    with gr.Row(elem_classes=["terminal-header"]):
+        gr.Markdown("### Operation Terminal", elem_classes=["terminal-title"])
+        copy_btn = gr.Button("Copy Session Log", variant="secondary", elem_id="copy-logs-btn", scale=0, min_width=170)
+
     operation_terminal = gr.HTML(
         value=format_operation_trace("", ""),
         elem_id="operation-terminal",
@@ -945,7 +989,7 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="zinc", secondary_hue="zinc")
     demo_btn.click(
         fn=run_demo_replay,
         inputs=scenario_dropdown,
-        outputs=[operation_terminal, status_banner, download_logs],
+        outputs=[operation_terminal, status_banner, download_logs, log_textbox],
         scroll_to_output=True,
         concurrency_limit=20,
         concurrency_id="demo_replay"
@@ -954,10 +998,73 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="zinc", secondary_hue="zinc")
     launch_btn.click(
         fn=launch_duel,
         inputs=scenario_dropdown,
-        outputs=[operation_terminal, status_banner, download_logs],
+        outputs=[operation_terminal, status_banner, download_logs, log_textbox],
         scroll_to_output=True,
         concurrency_limit=1,
         concurrency_id="live_gpu_duel"
+    )
+
+    copy_btn.click(
+        fn=None,
+        inputs=[log_textbox],
+        js="""(text) => {
+            let finalText = text;
+            if (!finalText) {
+                const pre = document.querySelector('.operation-shell pre');
+                if (pre) {
+                    finalText = pre.innerText;
+                }
+            }
+            if (finalText) {
+                try {
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(finalText).then(() => {
+                            updateButtonText();
+                        }).catch(err => {
+                            fallbackCopy(finalText);
+                        });
+                    } else {
+                        fallbackCopy(finalText);
+                    }
+                } catch (e) {
+                    fallbackCopy(finalText);
+                }
+            } else {
+                alert('No logs to copy yet. Run a duel first.');
+            }
+
+            function fallbackCopy(val) {
+                try {
+                    const textArea = document.createElement("textarea");
+                    textArea.value = val;
+                    textArea.style.top = "0";
+                    textArea.style.left = "0";
+                    textArea.style.position = "fixed";
+                    document.body.appendChild(textArea);
+                    textArea.focus();
+                    textArea.select();
+                    const successful = document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                    if (successful) {
+                        updateButtonText();
+                    } else {
+                        alert('Copying is blocked by your browser settings in this sandbox.');
+                    }
+                } catch (err) {
+                    alert('Failed to copy text: ' + err);
+                }
+            }
+
+            function updateButtonText() {
+                const btn = document.getElementById('copy-logs-btn');
+                if (btn) {
+                    const span = btn.querySelector('span') || btn;
+                    const oldText = span.innerText;
+                    span.innerText = 'Copied!';
+                    setTimeout(() => { span.innerText = oldText; }, 2000);
+                }
+            }
+        }"""
     )
 
 demo.queue(max_size=50, default_concurrency_limit=2)
